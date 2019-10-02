@@ -19,6 +19,7 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
+import org.apache.kafka.connect.header.Headers;
 
 public class FieldsMetadata {
 
@@ -71,12 +73,12 @@ public class FieldsMetadata {
   }
 
   public static FieldsMetadata extract(
-      final String tableName,
-      final JdbcSinkConfig.PrimaryKeyMode pkMode,
-      final List<String> configuredPkFields,
-      final Set<String> fieldsWhitelist,
-      final Schema keySchema,
-      final Schema valueSchema
+          final String tableName,
+          final JdbcSinkConfig.PrimaryKeyMode pkMode,
+          final List<String> configuredPkFields,
+          final Set<String> fieldsWhitelist,
+          final Schema keySchema,
+          final Schema valueSchema
   ) {
     if (valueSchema != null && valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
@@ -124,10 +126,55 @@ public class FieldsMetadata {
 
     if (allFields.isEmpty()) {
       throw new ConnectException(
-          "No fields found using key and value schemas for table: " + tableName
+              "No fields found using key and value schemas for table: " + tableName
       );
     }
 
+    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFields);
+  }
+
+  //FLATTEN:
+  public static FieldsMetadata extract(
+      final String tableName,
+      final JdbcSinkConfig.PrimaryKeyMode pkMode,
+      final SchemaPair schemaPair,
+      final Headers headers,
+      boolean deleteEnabled
+  ) {
+    if (schemaPair.valueSchema != null && schemaPair.valueSchema.type() != Schema.Type.STRUCT) {
+      throw new ConnectException("Value schema must be of type Struct");
+    }
+
+    final Map<String, SinkRecordField> allFields = new HashMap<>();
+
+    final Set<String> keyFieldNames = new LinkedHashSet<>();
+    switch (pkMode) {
+      case FLATTEN:
+        extractFlattenededPk(tableName, schemaPair.keySchema, schemaPair.valueSchema, allFields, keyFieldNames, headers, deleteEnabled);
+        break;
+      default:
+        throw new ConnectException("Unknown primary key mode: " + pkMode);
+    }
+
+    final Set<String> nonKeyFieldNames = new LinkedHashSet<>();
+
+    if (schemaPair.valueSchema != null) {
+      for (Field field : schemaPair.valueSchema.fields()) {
+        if (keyFieldNames.contains(field.name())) {
+          continue;
+        }
+        nonKeyFieldNames.add(field.name());
+
+        final Schema fieldSchema = field.schema();
+        allFields.put(field.name(), new SinkRecordField(fieldSchema, field.name(), false));
+      }
+    }
+
+    if (allFields.isEmpty()) {
+      throw new ConnectException(
+          "No fields found using key and value schemas for table: " + tableName
+      );
+    }
     return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFields);
   }
 
@@ -259,6 +306,84 @@ public class FieldsMetadata {
     for (String fieldName : keyFieldNames) {
       final Schema fieldSchema = valueSchema.field(fieldName).schema();
       allFields.put(fieldName, new SinkRecordField(fieldSchema, fieldName, true));
+    }
+  }
+
+  //FLATTEN:
+  private static void extractFlattenededPk(
+          final String tableName,
+          final Schema keySchema,
+          final Schema valueSchema,
+          final Map<String, SinkRecordField> allFields,
+          final Set<String> keyFieldNames,
+          final Headers headers,
+          boolean deleteEnabled
+
+  ) {
+    if (valueSchema == null && deleteEnabled) {
+      if (keySchema == null) {
+        throw new ConnectException(String.format(
+                "PK mode for table '%s' is %s, but record key schema is missing",
+                tableName,
+                JdbcSinkConfig.PrimaryKeyMode.FLATTEN
+        ));
+      }
+      final Schema.Type keySchemaType = keySchema.type();
+      if (keySchemaType.isPrimitive()) {
+        if (headers.size() != 1) {
+          throw new ConnectException(String.format(
+                  "Need exactly one PK column defined since the key schema for records is a "
+                          + "primitive type, defined columns are: %s",
+                  headers
+          ));
+        }
+        final List<String> fieldName = new ArrayList<>();
+        headers.forEach(h -> fieldName.add(h.value().toString()));
+        keyFieldNames.add(fieldName.get(0));
+        allFields.put(fieldName.get(0), new SinkRecordField(keySchema, fieldName.get(0), true));
+      } else if (keySchemaType == Schema.Type.STRUCT) {
+          headers.forEach(h -> {
+            final Field keyField = keySchema.field(h.key());
+            if (keyField == null) {
+              throw new ConnectException(String.format(
+                      "PK mode for table '%s' is %s with configured PK fields %s, but record key "
+                              + "schema does not contain field: %s",
+                      tableName, JdbcSinkConfig.PrimaryKeyMode.FLATTEN, headers, h.key()
+              ));
+            }
+            keyFieldNames.add(h.value().toString());
+            final Schema fieldSchema = keySchema.field(h.key()).schema();
+            allFields.put(h.value().toString(), new SinkRecordField(fieldSchema, h.value().toString(), true));
+          });
+      } else {
+        throw new ConnectException(
+                "Key schema must be primitive type or Struct, but is of type: " + keySchemaType
+        );
+      }
+    }
+    else {
+      if (valueSchema == null) {
+        throw new ConnectException(String.format(
+                "PK mode for table '%s' is %s, but record value schema is missing",
+                tableName,
+                JdbcSinkConfig.PrimaryKeyMode.FLATTEN)
+        );
+      }
+      headers.forEach(h -> {
+        if (valueSchema.field(h.value().toString()) == null) {
+          throw new ConnectException(String.format(
+                  "PK mode for table '%s' is %s with configured PK fields %s, but record value "
+                          + "schema does not contain this field.",
+                  tableName, JdbcSinkConfig.PrimaryKeyMode.FLATTEN, h.value().toString()
+          ));
+        } else {
+          keyFieldNames.add(h.value().toString());
+        }
+      });
+      for (String fieldName : keyFieldNames) {
+        final Schema fieldSchema = valueSchema.field(fieldName).schema();
+        allFields.put(fieldName, new SinkRecordField(fieldSchema, fieldName, true));
+      }
     }
   }
 

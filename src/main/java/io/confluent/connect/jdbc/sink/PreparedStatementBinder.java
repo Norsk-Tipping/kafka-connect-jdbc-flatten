@@ -19,10 +19,12 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Iterator;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialect.StatementBinder;
@@ -123,6 +125,32 @@ public class PreparedStatementBinder implements StatementBinder {
         for (String fieldName : fieldsMetadata.keyFieldNames) {
           final Field field = schemaPair.valueSchema.field(fieldName);
           bindField(index++, field.schema(), ((Struct) record.value()).get(field));
+        }
+      }
+      break;
+
+      case FLATTEN: {
+        if (record.valueSchema() == null) {
+          for (String fieldName : fieldsMetadata.keyFieldNames) {
+            final Field field;
+            String origName = null;
+            Iterator<Header> iterator = record.headers().iterator();
+            while (iterator.hasNext() && origName == null) {
+              Header header = iterator.next();
+              String key = header.key();
+              String value = header.value().toString();
+              if (value.equals(fieldName)) {origName = key;}
+            }
+            field = schemaPair.keySchema.field(origName);
+            bindField(index++, field.schema(), ((Struct) record.key()).get(origName));
+          }
+        }
+          else {
+          for (String fieldName : fieldsMetadata.keyFieldNames) {
+            final Field field;
+             field = schemaPair.valueSchema.field(fieldName);
+            bindField(index++, field.schema(), ((Struct) record.value()).get(field));
+          }
         }
       }
       break;

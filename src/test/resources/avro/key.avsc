@@ -1,0 +1,17 @@
+{
+    "type": "record",
+    "name": "NestedTestKey",
+    "namespace": "namespace",
+    "fields": [
+        {
+            "name": "INT",
+            "type": [
+                "null",
+                "int"
+            ],
+            "doc": "An int test value",
+            "default": null
+        }
+    ],
+    "version": "1"
+}

@@ -1,0 +1,80 @@
+{
+    "type": "record",
+    "name": "NestedTestValue",
+    "namespace": "namespace",
+    "fields": [
+        {
+            "name": "INT",
+            "type": [
+                "null",
+                "int"
+            ],
+            "doc": "An int test value",
+            "default": null
+        },
+        {
+            "name": "ROOTRECORD",
+            "type": [
+                "null",
+                {
+                    "type": "record",
+                    "name": "ROOTELEMENTS",
+                    "fields": [
+                        {
+                            "name": "ROOTSTRING1",
+                            "type": [
+                                "null",
+                                "string"
+                            ],
+                            "doc": "A root string element",
+                            "default": null
+                        },
+                        {
+                            "name": "ROOTSTRING2",
+                            "type": [
+                                "null",
+                                "string"
+                            ],
+                            "doc": "A root string element",
+                            "default": null
+                        },
+                        {
+                            "name": "CHILDRECORD",
+                            "type": [
+                                "null",
+                                {
+                                    "type": "record",
+                                    "name": "CHILDELEMENTS",
+                                    "fields": [
+                                        {
+                                            "name": "CHILDSTRING1",
+                                            "type": [
+                                                "null",
+                                                "string"
+                                            ],
+                                            "doc": "A child string element",
+                                            "default": null
+                                        },
+                                        {
+                                            "name": "CHILDSTRING2",
+                                            "type": [
+                                                "null",
+                                                "string"
+                                            ],
+                                            "doc": "A child string element",
+                                            "default": null
+                                        }
+                                    ]
+                                }
+                            ],
+                            "default": null
+                        }
+                    ]
+                }
+            ],
+            "doc": "A root record element",
+            "default": null
+        }
+    ],
+    "version": "2"
+}

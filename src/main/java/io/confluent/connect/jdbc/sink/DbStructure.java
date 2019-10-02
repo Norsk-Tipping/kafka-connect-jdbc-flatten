@@ -38,6 +38,11 @@ public class DbStructure {
   private static final Logger log = LoggerFactory.getLogger(DbStructure.class);
 
   private final DatabaseDialect dbDialect;
+
+  public TableDefinitions getTableDefns() {
+    return tableDefns;
+  }
+
   private final TableDefinitions tableDefns;
 
   public DbStructure(DatabaseDialect dbDialect) {

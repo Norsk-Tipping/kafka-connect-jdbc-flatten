@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
 
@@ -52,7 +53,8 @@ public class JdbcSinkConfig extends AbstractConfig {
     NONE,
     KAFKA,
     RECORD_KEY,
-    RECORD_VALUE;
+    RECORD_VALUE,
+    FLATTEN;
   }
 
   public static final List<String> DEFAULT_KAFKA_PK_NAMES = Collections.unmodifiableList(
@@ -156,7 +158,6 @@ public class JdbcSinkConfig extends AbstractConfig {
       + "    If empty, all fields from the value struct will be used, otherwise used to extract "
       + "the desired fields.";
   private static final String PK_FIELDS_DISPLAY = "Primary Key Fields";
-
   public static final String PK_MODE = "pk.mode";
   private static final String PK_MODE_DEFAULT = "none";
   private static final String PK_MODE_DOC =
@@ -169,7 +170,10 @@ public class JdbcSinkConfig extends AbstractConfig {
       + "``record_key``\n"
       + "    Field(s) from the record key are used, which may be a primitive or a struct.\n"
       + "``record_value``\n"
-      + "    Field(s) from the record value are used, which must be a struct.";
+      + "    Field(s) from the record value are used, which must be a struct."
+      + "``flatten``\n"
+      + "    Field(s) from the record value are used, which propagate down in an hierarchical structure.\n"
+      + "    Field paths are specified in flatten.pk_propagate_value_fields.";
   private static final String PK_MODE_DISPLAY = "Primary Key Mode";
 
   public static final String FIELDS_WHITELIST = "fields.whitelist";
@@ -189,6 +193,8 @@ public class JdbcSinkConfig extends AbstractConfig {
   private static final String DATAMAPPING_GROUP = "Data Mapping";
   private static final String DDL_GROUP = "SQL/DDL Support";
   private static final String RETRIES_GROUP = "Retries";
+
+  private static final String TRANSFORMATION_GROUP = "Transformation Support";
 
   public static final String DIALECT_NAME_CONFIG = "dialect.name";
   private static final String DIALECT_NAME_DISPLAY = "Database Dialect";
@@ -218,6 +224,89 @@ public class JdbcSinkConfig extends AbstractConfig {
 
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
+
+  //FLATTEN:
+  //Added flag to indicate flattening
+  public static final String FLATTEN = "flatten";
+  private static final String FLATTEN_DEFAULT = "false";
+  private static final String FLATTEN_DOC =
+          "Whether to automatically flatten arrays and write arrays to seperate"
+                  + "destination tables based on array value schema.";
+  private static final String FLATTEN_DISPLAY = "Flatten";
+  //FLATTEN:
+  //Added flag to indicate coordinates
+  public static final String COORDINATES = "flatten.coordinates";
+  private static final String COORDINATES_DEFAULT = "false";
+  private static final String COORDINATES_DOC =
+          "Whether to store topic, partition, offset in target tables when"
+                  + " flatten is enabled"
+                  + "destination tables based on array value schema.";
+  private static final String COORDINATES_DISPLAY = "Coordinates";
+  //FLATTEN:
+  //Added flattencoordinatenames to set the required name for timestamp. partition,
+  //offset, topic
+  public static final String FIELDS_COORDINATES = "flatten.coordinates.fields";
+  private static final String FIELDS_COORDINATES_DEFAULT = "kafkatopic, kafkapartition, "
+          + "kafkaoffset, kafkatimestamp, kafkatimestamp_type";
+  private static final String FIELDS_COORDINATES_DOC =
+          "List of comma-separated kafka metadata field names. If empty, "
+                  + "the defaults: kafkatopic, kafkapartition, kafkaoffset, "
+                  + "kafkatimestamp will be used. Note that coordinates must be set to true "
+                  + "to propagate the record metadata to the sink.";
+  private static final String FIELDS_COORDINATES_DISPLAY = "Fields coordinates";
+  //FLATTEN:
+  //Added fields that allow to rename flattened fields
+  public static final String RENAME_FIELDS = "flatten.rename_fields";
+  private static final String RENAME_FIELDS_DEFAULT = "";
+  private static final String RENAME_FIELDS_DOC =
+          "Whether to rename fields when flattening is enabled with flatten";
+  private static final String RENAME_FIELDS_DISPLAY = "Rename fields";
+  //FLATTEN:
+  //Added fields that allow to rename table names
+  public static final String TABLES_RENAME = "flatten.rename_tables";
+  private static final String TABLES_RENAME_DEFAULT = "";
+  private static final String TABLES_RENAME_DOC =
+          "Whether to rename tables with enlisted mapping pairs <old name>:<new name>";
+  private static final String TABLES_RENAME_DISPLAY = "Rename tables";
+  //FLATTEN:
+  //Added flag to indicate uppercase or lowercase
+  public static final String FLATTEN_UPPERCASE = "flatten.uppercase";
+  private static final String FLATTEN_UPPERCASE_DEFAULT = "false";
+  private static final String FLATTEN_UPPERCASE_DOC =
+          "Whether to automatically apply uppercase to columns when flatten is enabled."
+                  + " When set to false lowercase will be applied.";
+  private static final String FLATTEN_UPPERCASE_DISPLAY = "Uppercase flattened fields";
+  //FLATTEN:
+  //Added flag to indicate the delimiter for flattened record fields
+  public static final String FLATTEN_DELIMITER = "flatten.delimiter";
+  private static final String FLATTEN_DELIMITER_DEFAULT = "_";
+  private static final String FLATTEN_DELIMITER_DOC =
+          "Symbol used to concatenate flattened record fields and table names when flatten is enabled."
+                  + " By default _ will be used.";
+  private static final String FLATTEN_DELIMITER_DISPLAY = "Symbol to concatenate flattened fields";
+  //FLATTEN:
+  //Added flag to indicate the pathnames of primary key fields that need to propagate down the hierarchy when flatten is enabled
+  public static final String FLATTEN_PK_PROPAGATE_VALUE_FIELDS = "flatten.pk_propagate_value_fields";
+  private static final String FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DEFAULT = "";
+  private static final String FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DOC =
+          "List of comma-separated primary key field paths (suffix of root schema, followed by '.' seperated subpath of fieldnames).\n" +
+          "Listed fields will propagate down to any flattened subcontainers lower in the hierarchy path as primary key";
+  private static final String FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DISPLAY = "Fields that need to propagate down the hierarchy as primary keys when flatten is enabled";
+  //FLATTEN:
+  public static final String FLATTEN_WHITELIST_CONTAINERS = "flatten.containers.whitelist";
+  private static final String FLATTEN_WHITELIST_CONTAINERS_DEFAULT = "";
+  private static final String FLATTEN_WHITELIST_CONTAINERS_DOC =
+          "List of comma-separated record container paths. If empty, all containers and subcontainers are "
+                  + "utilized, otherwise used to filter to the desired containers within the hierarchical value structure.\n";
+  //FLATTEN:
+  private static final String FLATTEN_WHITELIST_CONTAINERS_DISPLAY = "Fields Whitelist within hierarchical structure";
+  public static final String FLATTEN_INSTRUCTION_CACHE_SIZE = "flatten.instruction_cache_size";
+  private static final String FLATTEN_INSTRUCTION_CACHE_SIZE_DEFAULT = "100";
+  private static final String FLATTEN_INSTRUCTION_CACHE_SIZE_DOC =
+          "Size of instruction cache needed for flattening Connect schema into subschemas. Cache maintains a mapping between \n" +
+                  "Connect Schema and instructions to flatten these to subschemas and substructures";
+  //FLATTEN:
+  private static final String FLATTEN_INSTRUCTION_CACHE_SIZE_DISPLAY = "Cache size for flattening instructions per Connect Schema";
 
   public static final ConfigDef CONFIG_DEF = new ConfigDef()
         // Connection
@@ -415,7 +504,139 @@ public class JdbcSinkConfig extends AbstractConfig {
             2,
             ConfigDef.Width.SHORT,
             RETRY_BACKOFF_MS_DISPLAY
-        );
+        ) //FLATTEN://Added flag to indicate flattening of arrays
+        .define(
+            FLATTEN,
+            ConfigDef.Type.BOOLEAN,
+            FLATTEN_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_DOC, TRANSFORMATION_GROUP,
+            1,
+            ConfigDef.Width.SHORT,
+            FLATTEN_DISPLAY,
+            Arrays.asList(COORDINATES, FLATTEN_UPPERCASE)
+        )
+          //FLATTEN://Added flag to indicate kafka coordinates without use of pkmode Kafka
+        .define(
+            COORDINATES,
+            ConfigDef.Type.BOOLEAN,
+            COORDINATES_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            COORDINATES_DOC, TRANSFORMATION_GROUP,
+            2,
+            ConfigDef.Width.SHORT,
+            COORDINATES_DISPLAY,
+            Arrays.asList(FIELDS_COORDINATES)
+        )
+          //FLATTEN://Added list to override kafka coordinates names that propagate to
+        //sink when coordinates enables
+        .define(
+            FIELDS_COORDINATES,
+            ConfigDef.Type.LIST,
+            FIELDS_COORDINATES_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FIELDS_COORDINATES_DOC,
+            TRANSFORMATION_GROUP,
+            3,
+            ConfigDef.Width.LONG,
+            FIELDS_COORDINATES_DISPLAY
+        )
+          //FLATTEN://Added flag to indicate uppercase or lowercase for table names and columns
+        .define(
+            FLATTEN_UPPERCASE,
+            ConfigDef.Type.BOOLEAN,
+            FLATTEN_UPPERCASE_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_UPPERCASE_DOC, TRANSFORMATION_GROUP,
+            4,
+            ConfigDef.Width.SHORT,
+            FLATTEN_UPPERCASE_DISPLAY
+        )
+          //FLATTEN://Added list of record fields that should be renamed after flattening records
+        .define(RENAME_FIELDS,
+            ConfigDef.Type.LIST,
+                RENAME_FIELDS_DEFAULT,
+            new ConfigDef.Validator() {
+              @Override
+              public void ensureValid(String name, Object value) {
+                parseToMap(name, (List<String>) value);
+              }
+
+              @Override
+              public String toString() {
+                return "list of colon-delimited pairs, e.g. <code>foo:bar,abc:xyz</code>";
+              }
+            },
+            ConfigDef.Importance.MEDIUM,
+                RENAME_FIELDS_DOC,
+            TRANSFORMATION_GROUP,
+            5,
+            ConfigDef.Width.LONG,
+                RENAME_FIELDS_DISPLAY)
+          //FLATTEN://Added list of table names that should be renamed after flattening records
+        .define(TABLES_RENAME,
+            ConfigDef.Type.LIST,
+            TABLES_RENAME_DEFAULT,
+            new ConfigDef.Validator() {
+              @Override
+              public void ensureValid(String name, Object value) {
+                parseToMap(name, (List<String>) value);
+              }
+
+              @Override
+              public String toString() {
+                return "list of colon-delimited pairs, e.g. <code>foo:bar,abc:xyz</code>";
+              }
+            },
+            ConfigDef.Importance.MEDIUM,
+            TABLES_RENAME_DOC,
+            TRANSFORMATION_GROUP,
+            6,
+            ConfigDef.Width.LONG,
+            TABLES_RENAME_DISPLAY)
+          //FLATTEN://Added flag to indicate uppercase or lowercase for table names and columns
+          .define(
+            FLATTEN_DELIMITER,
+            ConfigDef.Type.STRING,
+            FLATTEN_DELIMITER_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_DELIMITER_DOC, TRANSFORMATION_GROUP,
+              7,
+            ConfigDef.Width.SHORT,
+            FLATTEN_DELIMITER_DISPLAY
+          )
+          //FLATTEN://Added list of fields from the value that need to propagate doen the hierarchy structure as primary keys
+          .define(
+            FLATTEN_PK_PROPAGATE_VALUE_FIELDS,
+            ConfigDef.Type.LIST,
+            FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DOC, TRANSFORMATION_GROUP,
+            8,
+            ConfigDef.Width.LONG,
+            FLATTEN_PK_PROPAGATE_VALUE_FIELDS_DISPLAY
+          )
+          //FLATTEN://Added list of fields to whitelist fields within hierarchy structure
+          .define(
+            FLATTEN_WHITELIST_CONTAINERS,
+            ConfigDef.Type.LIST,
+            FLATTEN_WHITELIST_CONTAINERS_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_WHITELIST_CONTAINERS_DOC, TRANSFORMATION_GROUP,
+            9,
+            ConfigDef.Width.LONG,
+            FLATTEN_WHITELIST_CONTAINERS_DISPLAY
+          )
+          .define(
+            FLATTEN_INSTRUCTION_CACHE_SIZE,
+            ConfigDef.Type.INT,
+            FLATTEN_INSTRUCTION_CACHE_SIZE_DEFAULT,
+            ConfigDef.Importance.MEDIUM,
+            FLATTEN_INSTRUCTION_CACHE_SIZE_DOC, TRANSFORMATION_GROUP,
+            10,
+            ConfigDef.Width.SHORT,
+            FLATTEN_INSTRUCTION_CACHE_SIZE_DISPLAY
+          );
 
   public final String connectionUrl;
   public final String connectionUser;
@@ -433,6 +654,26 @@ public class JdbcSinkConfig extends AbstractConfig {
   public final Set<String> fieldsWhitelist;
   public final String dialectName;
   public final TimeZone timeZone;
+  //FLATTEN: flatten boolean
+  public final boolean flatten;
+  //FLATTEN: Gert: coordinates boolean
+  public final boolean flattencoordinates;
+  //FLATTEN: coordinate names
+  public final List<String> flattencoordinatenames;
+  //FLATTEN: uppercase boolean
+  public final boolean flattenUppercase;
+  //FLATTEN: record field rename mappings
+  public final Map<String, String> flattenfieldrenames;
+  //FLATTEN: table field rename mappings
+  public final Map<String, String> flattentablenamesrenames;
+  //FLATTEN: delimiter symbol
+  public final String flattenDelimiter;
+  //FLATTEN: pk field paths
+  public final List<String> flattenPkValueFields;
+  //FLATTEN: whitelisted container
+  public final List<String> flattenWhitelistContainers;
+  //FLATTEN: instruction cache size of the cache per schama
+  public final int flattenInstructionCacheSize;
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
@@ -453,11 +694,41 @@ public class JdbcSinkConfig extends AbstractConfig {
     fieldsWhitelist = new HashSet<>(getList(FIELDS_WHITELIST));
     String dbTimeZone = getString(DB_TIMEZONE_CONFIG);
     timeZone = TimeZone.getTimeZone(ZoneId.of(dbTimeZone));
-
-    if (deleteEnabled && pkMode != PrimaryKeyMode.RECORD_KEY) {
+  //FLATTEN:
+    if (deleteEnabled && pkMode != PrimaryKeyMode.RECORD_KEY && pkMode != PrimaryKeyMode.FLATTEN) {
       throw new ConfigException(
-          "Primary key mode must be 'record_key' when delete support is enabled");
+          "Primary key mode must be 'record_key' or 'flatten' when delete support is enabled");
     }
+    //FLATTEN:
+    //flatten arrays boolean
+    flatten = getBoolean(FLATTEN);
+    //FLATTEN:
+    //coordinates boolean
+    flattencoordinates = getBoolean(COORDINATES);
+    //FLATTEN:
+    //coordinates names
+    flattencoordinatenames = getList(FIELDS_COORDINATES).stream().map(String::toLowerCase).collect(Collectors.toList());
+    //FLATTEN:
+    //uppercase or lowercase for columns (flattened fields) and table names boolean
+    flattenUppercase = getBoolean(FLATTEN_UPPERCASE);
+    //FLATTEN:
+    //record field rename mappings
+    flattenfieldrenames = parseToMap(RENAME_FIELDS, getList(RENAME_FIELDS));
+    //FLATTEN:
+    //table names rename mappings
+    flattentablenamesrenames = parseToMap(TABLES_RENAME, getList(TABLES_RENAME));
+    //FLATTEN:
+    //delimiter for flattened fields
+    flattenDelimiter = getString(FLATTEN_DELIMITER);
+    //FLATTEN:
+    //pkValueFields list
+    flattenPkValueFields = getList(FLATTEN_PK_PROPAGATE_VALUE_FIELDS).stream().map(String::toLowerCase).collect(Collectors.toList());
+    //FLATTEN:
+    //container whitelist
+    flattenWhitelistContainers = getList(FLATTEN_WHITELIST_CONTAINERS).stream().map(String::toLowerCase).collect(Collectors.toList());;
+    //FLATTEN:
+    //instruction cache size
+    flattenInstructionCacheSize = getInt(FLATTEN_INSTRUCTION_CACHE_SIZE);
   }
 
   private String getPasswordValue(String key) {
@@ -498,6 +769,17 @@ public class JdbcSinkConfig extends AbstractConfig {
     @Override
     public String toString() {
       return canonicalValues.toString();
+    }
+  }
+  //FLATTEN:
+  //Parse the configured rename mappings for record fields --ultimately the table column
+  private static Map<String, String> parseToMap(String key, List<String> mappings) {
+    Map<String, String> map;
+    try {
+      map = mappings.stream().map(s -> s.split(":")).collect(Collectors.toMap(s -> s[0].toLowerCase(), s -> s[1].toLowerCase()));
+      return map;
+    } catch (Exception e) {
+      throw new ConfigException(key, mappings, "List can't be converted to map: " + e.getMessage());
     }
   }
 

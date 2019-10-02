@@ -78,7 +78,6 @@ public class BufferedRecords {
 
   public List<SinkRecord> add(SinkRecord record) throws SQLException {
     final List<SinkRecord> flushed = new ArrayList<>();
-
     boolean schemaChanged = false;
     if (!Objects.equals(keySchema, record.keySchema())) {
       keySchema = record.keySchema();
@@ -111,13 +110,26 @@ public class BufferedRecords {
           record.keySchema(),
           record.valueSchema()
       );
-      fieldsMetadata = FieldsMetadata.extract(
-          tableId.tableName(),
-          config.pkMode,
-          config.pkFields,
-          config.fieldsWhitelist,
-          schemaPair
-      );
+      //FLATTEN:
+      if (config.flatten && config.pkMode == JdbcSinkConfig.PrimaryKeyMode.FLATTEN) {
+        fieldsMetadata = FieldsMetadata.extract(
+                tableId.tableName(),
+                config.pkMode,
+                schemaPair,
+                record.headers(),
+                config.deleteEnabled
+        );
+      }
+      else {
+        fieldsMetadata = FieldsMetadata.extract(
+                tableId.tableName(),
+                config.pkMode,
+                config.pkFields,
+                config.fieldsWhitelist,
+                schemaPair
+        );
+      }
+
       dbStructure.createOrAmendIfNecessary(
           config,
           connection,
@@ -312,6 +324,24 @@ public class BufferedRecords {
                 "Deletes to table '%s' are not supported with the %s dialect.",
                 tableId,
                 dbDialect.name()
+            ));
+          }
+          break;
+        //FLATTEN:
+        case FLATTEN:
+          if (fieldsMetadata.keyFieldNames.isEmpty()) {
+            throw new ConnectException("Require primary keys to support delete");
+          }
+          try {
+            sql = dbDialect.buildDeleteStatement(
+                    tableId,
+                    asColumns(fieldsMetadata.keyFieldNames)
+            );
+          } catch (UnsupportedOperationException e) {
+            throw new ConnectException(String.format(
+                    "Deletes to table '%s' are not supported with the %s dialect.",
+                    tableId,
+                    dbDialect.name()
             ));
           }
           break;

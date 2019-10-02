@@ -44,7 +44,9 @@ public class DeleteEnabledRecommender implements ConfigDef.Recommender {
 
   private static boolean isRecordKeyPKMode(final Map<String, Object> parsedConfig) {
     return JdbcSinkConfig.PrimaryKeyMode.RECORD_KEY.name()
-        .equalsIgnoreCase(String.valueOf(parsedConfig.get(PK_MODE)));
+        .equalsIgnoreCase(String.valueOf(parsedConfig.get(PK_MODE))) ||
+            JdbcSinkConfig.PrimaryKeyMode.FLATTEN.name()
+                    .equalsIgnoreCase(String.valueOf(parsedConfig.get(PK_MODE)));
   }
 
 }

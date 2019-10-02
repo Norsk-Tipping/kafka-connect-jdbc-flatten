@@ -1,0 +1,129 @@
+{
+    "type": "record",
+    "name": "NestedTestValue",
+    "namespace": "namespace",
+    "fields": [
+        {
+            "name": "INT",
+            "type": [
+                "null",
+                "int"
+            ],
+            "doc": "An int test value",
+            "default": null
+        },
+        {
+            "name": "ROOTRECORD",
+            "type": [
+                "null",
+                {
+                    "type": "record",
+                    "name": "ROOTELEMENTS",
+                    "fields": [
+                        {
+                            "name": "ROOTSTRING1",
+                            "type": [
+                                "null",
+                                "string"
+                            ],
+                            "doc": "A root string element",
+                            "default": null
+                        },
+                        {
+                            "name": "ROOTSTRING2",
+                            "type": [
+                                "null",
+                                "string"
+                            ],
+                            "doc": "A root string element",
+                            "default": null
+                        },
+                        {
+                            "name": "CHILDRECORD",
+                            "type": [
+                                "null",
+                                {
+                                    "type": "record",
+                                    "name": "CHILDELEMENTS",
+                                    "fields": [
+                                        {
+                                            "name": "CHILDSTRING1",
+                                            "type": [
+                                                "null",
+                                                "string"
+                                            ],
+                                            "doc": "A child string element",
+                                            "default": null
+                                        },
+                                        {
+                                            "name": "CHILDSTRING2",
+                                            "type": [
+                                                "null",
+                                                "string"
+                                            ],
+                                            "doc": "A child string element",
+                                            "default": null
+                                        },
+                                        {
+                                            "name": "CHILDLIST",
+                                            "type": [
+                                                "null",
+                                                {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "record",
+                                                        "name": "CHILDLEVEL3ELEMENTS",
+                                                        "fields": [
+                                                            {
+                                                                "name": "CHILDLEVEL3STRING1",
+                                                                "type": [
+                                                                    "null",
+                                                                    "string"
+                                                                ],
+                                                                "doc": "A child level 3 string element",
+                                                                "default": null
+                                                            },
+                                                            {
+                                                                "name": "CHILDLEVEL3STRING2",
+                                                                "type": [
+                                                                    "null",
+                                                                    "string"
+                                                                ],
+                                                                "doc": "A child level 3 string element",
+                                                                "default": null
+                                                            },
+                                                            {
+                                                                "name": "CHILDLEVEL3DECIMAL",
+                                                                "type": [
+                                                                    "null",
+                                                                    {
+                                                                        "type": "bytes",
+                                                                        "logicalType": "decimal",
+                                                                        "precision": 4,
+                                                                        "scale": 2
+                                                                    }
+                                                                ],
+                                                                "doc": "A child level 3 decimal element",
+                                                                "default": null
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            ],
+                                            "doc": "A list of further nested elements",
+                                            "default": null
+                                        }
+                                    ]
+                                }
+                            ],
+                            "default": null
+                        }
+                    ]
+                }
+            ],
+            "doc": "A root record element",
+            "default": null
+        }
+    ],
+    "version": "2"
+}

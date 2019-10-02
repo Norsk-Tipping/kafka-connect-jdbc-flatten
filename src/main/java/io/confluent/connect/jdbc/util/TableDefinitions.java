@@ -18,10 +18,14 @@ package io.confluent.connect.jdbc.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.ConnectException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 
@@ -42,6 +46,17 @@ public class TableDefinitions {
    */
   public TableDefinitions(DatabaseDialect dialect) {
     this.dialect = dialect;
+  }
+
+  //FLATTEN:
+  public List<TableId> searchTableId(Connection connection, String tableName) throws ConnectException, SQLException {
+    if (tableName == null || tableName.length() == 0) {throw new ConnectException ("String to search for in cached table definitions is null");}
+    List<TableId> matchedTableIds = cache.keySet().stream().filter(ctid -> ctid.tableName().toUpperCase().startsWith(tableName.toUpperCase())).collect(Collectors.toList());
+    if (matchedTableIds.isEmpty()) {
+        dialect.tableIds(connection).stream().filter(tid -> tid.tableName().toLowerCase().startsWith(tableName.toLowerCase()))
+                .forEach(matchedTableIds::add);
+      }
+    return matchedTableIds;
   }
 
   /**
