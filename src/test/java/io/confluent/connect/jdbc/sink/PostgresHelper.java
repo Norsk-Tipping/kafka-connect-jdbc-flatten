@@ -63,7 +63,7 @@ public final class PostgresHelper {
   }
 
   public void deleteTable(final String table) throws SQLException {
-    execute("DROP TABLE IF EXISTS " + table);
+    execute("DROP TABLE IF EXISTS \"" + table +"\"");
 
     //random errors of table not being available happens in the unit tests
     try {
