@@ -61,6 +61,7 @@ public class BufferedRecords {
   private StatementBinder updateStatementBinder;
   private StatementBinder deleteStatementBinder;
   private boolean deletesInBatch = false;
+  private boolean updatesInBatch = false;
 
   public BufferedRecords(
       JdbcSinkConfig config,
@@ -93,9 +94,11 @@ public class BufferedRecords {
     } else if (Objects.equals(valueSchema, record.valueSchema())) {
       if (config.deleteEnabled && deletesInBatch) {
         // flush so an insert after a delete of same record isn't lost
+        updatesInBatch = true;
         flushed.addAll(flush());
       }
     } else {
+      updatesInBatch = true;
       // value schema is not null and has changed. This is a real schema change.
       valueSchema = record.valueSchema();
       schemaChanged = true;
@@ -212,6 +215,7 @@ public class BufferedRecords {
     final List<SinkRecord> flushedRecords = records;
     records = new ArrayList<>();
     deletesInBatch = false;
+    updatesInBatch = false;
     return flushedRecords;
   }
 
@@ -220,11 +224,13 @@ public class BufferedRecords {
    */
   private Optional<Long> executeUpdates() throws SQLException {
     Optional<Long> count = Optional.empty();
-    for (int updateCount : updatePreparedStatement.executeBatch()) {
-      if (updateCount != Statement.SUCCESS_NO_INFO) {
-        count = count.isPresent()
-            ? count.map(total -> total + updateCount)
-            : Optional.of((long) updateCount);
+    if (updatesInBatch) {
+      for (int updateCount : updatePreparedStatement.executeBatch()) {
+        if (updateCount != Statement.SUCCESS_NO_INFO) {
+          count = count.isPresent()
+                  ? count.map(total -> total + updateCount)
+                  : Optional.of((long) updateCount);
+        }
       }
     }
     return count;
@@ -232,7 +238,7 @@ public class BufferedRecords {
 
   private long executeDeletes() throws SQLException {
     long totalDeleteCount = 0;
-    if (nonNull(deletePreparedStatement)) {
+    if (nonNull(deletePreparedStatement) && deletesInBatch) {
       for (int updateCount : deletePreparedStatement.executeBatch()) {
         if (updateCount != Statement.SUCCESS_NO_INFO) {
           totalDeleteCount += updateCount;
@@ -335,7 +341,7 @@ public class BufferedRecords {
           try {
             sql = dbDialect.buildDeleteStatement(
                     tableId,
-                    asColumns(fieldsMetadata.keyFieldNames)
+                    asColumns(fieldsMetadata.keyFieldNamesInKey)
             );
           } catch (UnsupportedOperationException e) {
             throw new ConnectException(String.format(

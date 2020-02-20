@@ -656,7 +656,7 @@ public class JdbcSinkConfig extends AbstractConfig {
   public final TimeZone timeZone;
   //FLATTEN: flatten boolean
   public final boolean flatten;
-  //FLATTEN: Gert: coordinates boolean
+  //FLATTEN: coordinates boolean
   public final boolean flattencoordinates;
   //FLATTEN: coordinate names
   public final List<String> flattencoordinatenames;

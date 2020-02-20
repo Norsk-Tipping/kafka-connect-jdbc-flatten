@@ -19,13 +19,7 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import org.apache.kafka.connect.header.Headers;
@@ -33,6 +27,8 @@ import org.apache.kafka.connect.header.Headers;
 public class FieldsMetadata {
 
   public final Set<String> keyFieldNames;
+  //FLATTEN:
+  public final Set<String> keyFieldNamesInKey;
   public final Set<String> nonKeyFieldNames;
   public final Map<String, SinkRecordField> allFields;
 
@@ -51,6 +47,30 @@ public class FieldsMetadata {
       ));
     }
     this.keyFieldNames = keyFieldNames;
+    this.nonKeyFieldNames = nonKeyFieldNames;
+    this.allFields = allFields;
+    //FLATTEN:
+    this.keyFieldNamesInKey = null;
+  }
+
+  //FLATTEN:
+  private FieldsMetadata(
+          Set<String> keyFieldNames,
+          Set<String> keyFieldNamesInKey,
+          Set<String> nonKeyFieldNames,
+          Map<String, SinkRecordField> allFields
+  ) {
+    boolean fieldCountsMatch = (keyFieldNames.size() + nonKeyFieldNames.size() == allFields.size());
+    boolean allFieldsContained = (allFields.keySet().containsAll(keyFieldNames)
+            && allFields.keySet().containsAll(nonKeyFieldNames));
+    if (!fieldCountsMatch || !allFieldsContained) {
+      throw new IllegalArgumentException(String.format(
+              "Validation fail -- keyFieldNames:%s nonKeyFieldNames:%s allFields:%s",
+              keyFieldNames, nonKeyFieldNames, allFields
+      ));
+    }
+    this.keyFieldNames = keyFieldNames;
+    this.keyFieldNamesInKey = keyFieldNamesInKey;
     this.nonKeyFieldNames = nonKeyFieldNames;
     this.allFields = allFields;
   }
@@ -148,9 +168,10 @@ public class FieldsMetadata {
     final Map<String, SinkRecordField> allFields = new HashMap<>();
 
     final Set<String> keyFieldNames = new LinkedHashSet<>();
+    final Set<String> keyFieldNamesInKey = new LinkedHashSet<>();
     switch (pkMode) {
       case FLATTEN:
-        extractFlattenededPk(tableName, schemaPair.keySchema, schemaPair.valueSchema, allFields, keyFieldNames, headers, deleteEnabled);
+        extractFlattenededPk(tableName, schemaPair.keySchema, schemaPair.valueSchema, allFields, keyFieldNames, keyFieldNamesInKey, headers, deleteEnabled);
         break;
       default:
         throw new ConnectException("Unknown primary key mode: " + pkMode);
@@ -175,7 +196,7 @@ public class FieldsMetadata {
           "No fields found using key and value schemas for table: " + tableName
       );
     }
-    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFields);
+    return new FieldsMetadata(keyFieldNames, keyFieldNamesInKey, nonKeyFieldNames, allFields);
   }
 
   private static void extractKafkaPk(
@@ -316,6 +337,7 @@ public class FieldsMetadata {
           final Schema valueSchema,
           final Map<String, SinkRecordField> allFields,
           final Set<String> keyFieldNames,
+          final Set<String> keyFieldNamesInKey,
           final Headers headers,
           boolean deleteEnabled
 
@@ -340,6 +362,7 @@ public class FieldsMetadata {
         final List<String> fieldName = new ArrayList<>();
         headers.forEach(h -> fieldName.add(h.value().toString()));
         keyFieldNames.add(fieldName.get(0));
+        keyFieldNamesInKey.add(fieldName.get(0));
         allFields.put(fieldName.get(0), new SinkRecordField(keySchema, fieldName.get(0), true));
       } else if (keySchemaType == Schema.Type.STRUCT) {
           headers.forEach(h -> {
@@ -352,6 +375,7 @@ public class FieldsMetadata {
               ));
             }
             keyFieldNames.add(h.value().toString());
+            keyFieldNamesInKey.add(h.value().toString());
             final Schema fieldSchema = keySchema.field(h.key()).schema();
             allFields.put(h.value().toString(), new SinkRecordField(fieldSchema, h.value().toString(), true));
           });
@@ -378,6 +402,13 @@ public class FieldsMetadata {
           ));
         } else {
           keyFieldNames.add(h.value().toString());
+          if (keySchema != null) {
+            if (keySchema.type() == Schema.Type.STRUCT) {
+              keySchema.fields().stream().filter(kf -> kf.name().equals(h.key())).forEach(kf -> keyFieldNamesInKey.add(h.value().toString()));
+            } else if (h.key().endsWith("\\.key")) {
+              keyFieldNamesInKey.add(h.value().toString());
+            }
+          }
         }
       });
       for (String fieldName : keyFieldNames) {

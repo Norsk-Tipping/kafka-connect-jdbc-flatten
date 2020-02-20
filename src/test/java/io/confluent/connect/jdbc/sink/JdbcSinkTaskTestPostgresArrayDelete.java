@@ -677,4 +677,186 @@ public class JdbcSinkTaskTestPostgresArrayDelete extends EasyMockSupport {
     );
   }
 
+  @Test
+  public void putJDBCRecordCarsDeletePrimitiveKey() throws Exception {
+    Map<String, String> props = new HashMap<>();
+    props.put("connection.url", postgresHelper.postgreSQL());
+    props.put("connection.user", "postgres");
+    props.put("connection.password", "password123");
+    props.put("auto.create", "true");
+    props.put("auto.evolve", "true");
+    props.put("flatten", "true");
+    props.put("pk.mode", "flatten");
+    props.put("flatten.coordinates", "true");
+    props.put("flatten.uppercase", "true");
+    props.put("pk.fields", "root.key");
+    props.put("insert.mode", "upsert");
+    props.put("flatten.pk_propagate_value_fields", "ROOT.age, ROOT.name,ROOT.CARS1.CARS1.n1,ROOT.CARS2.CARS2.p1");
+    props.put("flatten.rename_tables", "TestTopic_ROOT:Table01ROOT,TestTopic_ROOT_CARS1:Table02CAR1,TestTopic_ROOT_CARS2:Table03CAR2");
+    props.put("delete.enabled", "true");
+
+    JdbcSinkTask task = new JdbcSinkTask();
+    task.initialize(mock(SinkTaskContext.class));
+
+    task.start(props);
+
+    final List<Struct> cars1arrayFirst = new ArrayList<>();
+    final List<Struct> cars2arrayFirst = new ArrayList<>();
+    final Struct cars1recordFirst = new Struct(CARS1RECORD)
+            .put("n1", "Ford")
+            .put("n2", "BMW")
+            .put("n3", "Audi");
+    final Struct cars2recordFirst = new Struct(CARS2RECORD)
+            .put("p1", "Toyota")
+            .put("p2", "Renault")
+            .put("p3", "Marutti");
+    cars1arrayFirst.add(cars1recordFirst);
+    cars2arrayFirst.add(cars2recordFirst);
+    final Struct jdbcCarRecordFirst = new Struct(JDBC_CAR_RECORD)
+            .put("name", "John")
+            .put("age", "30")
+            .put("cars1", cars1arrayFirst )
+            .put("cars2", cars2arrayFirst )
+            ;
+    final String jdbcCarRecordKeyFirst = "30";
+
+    final List<Struct> cars1arraySecond = new ArrayList<>();
+    final List<Struct> cars2arraySecond = new ArrayList<>();
+    final Struct cars1recordSecond = new Struct(CARS1RECORD)
+            .put("n1", "Volvo")
+            .put("n2", "Ferrari")
+            .put("n3", "Mitsubishi");
+    final Struct cars2recordSecond = new Struct(CARS2RECORD)
+            .put("p1", "Mercedes")
+            .put("p2", "Peugeot")
+            .put("p3", "Tesla");
+    cars1arraySecond.add(cars1recordSecond);
+    cars2arraySecond.add(cars2recordSecond);
+    final Struct jdbcCarRecordSecond = new Struct(JDBC_CAR_RECORD)
+            .put("name", "Donald")
+            .put("age", "65")
+            .put("cars1", cars1arraySecond )
+            .put("cars2", cars2arraySecond )
+            ;
+    final String jdbcCarRecordKeySecond = "65";
+
+    final String jdbcCarNullValueFirst = "30";
+    final String jdbcCarNullValueSecond = "65";
+
+
+    final String topic = "TestTopic";
+    String tableName1 = "TABLE01ROOT";
+    String tableName2 = "TABLE02CAR1";
+    String tableName3 = "TABLE03CAR2";
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, Schema.STRING_SCHEMA, jdbcCarRecordKeyFirst, JDBC_CAR_RECORD, jdbcCarRecordFirst, 1)
+    ));
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, Schema.STRING_SCHEMA, jdbcCarRecordKeySecond, JDBC_CAR_RECORD, jdbcCarRecordSecond, 2)
+    ));
+
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\" WHERE \"ROOT_KEY\" = '30'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\" WHERE \"ROOT_KEY\" = '65'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\" WHERE \"ROOT_KEY\" = '30'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\" WHERE \"ROOT_KEY\" = '65'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, Schema.STRING_SCHEMA, jdbcCarNullValueFirst, null, null, 3)
+    ));
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\" WHERE \"ROOT_KEY\" = '30'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\" WHERE \"ROOT_KEY\" = '65'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\" WHERE \"ROOT_KEY\" = '30'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\" WHERE \"ROOT_KEY\" = '65'",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+  }
+
 }

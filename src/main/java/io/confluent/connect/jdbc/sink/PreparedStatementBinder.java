@@ -130,8 +130,8 @@ public class PreparedStatementBinder implements StatementBinder {
       break;
 
       case FLATTEN: {
-        if (record.valueSchema() == null) {
-          for (String fieldName : fieldsMetadata.keyFieldNames) {
+        if (record.valueSchema() == null && fieldsMetadata.keyFieldNamesInKey != null) {
+          for (String fieldName : fieldsMetadata.keyFieldNamesInKey) {
             final Field field;
             String origName = null;
             Iterator<Header> iterator = record.headers().iterator();
@@ -141,8 +141,13 @@ public class PreparedStatementBinder implements StatementBinder {
               String value = header.value().toString();
               if (value.equals(fieldName)) {origName = key;}
             }
-            field = schemaPair.keySchema.field(origName);
-            bindField(index++, field.schema(), ((Struct) record.key()).get(origName));
+            if (schemaPair.keySchema.type().isPrimitive()) {
+              bindField(index++, schemaPair.keySchema, record.key());
+            }
+            else {
+              field = schemaPair.keySchema.field(origName);
+              bindField(index++, field.schema(), ((Struct) record.key()).get(origName));
+            }
           }
         }
           else {
