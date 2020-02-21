@@ -137,7 +137,7 @@ public class FlattenTransformation {
             Stream.of(schemapair.valueSchema)
                     .flatMap(s -> getFlattenSchema(getContainerPathname(s), s, 0, new ArrayList<Container>()))
                     .collect(Collectors.toList());
-
+    log.debug("FlattenTransformation.getMainProcessingInstructions flattenedSchemaList: {}", flattenedSchemaList);
     //Group the list of entries by the sequence of containers they have in common up until the last Array or Map in their path is encountered.
     //If the entry does not have an Array or Map in its path they are grouped by the first container (main container).
     //These identified container(s) are the correct places in the hierarchical structure of the schema from where the schema is to be split into
@@ -614,8 +614,8 @@ public class FlattenTransformation {
     if (schema == null) {
       return Stream.empty();
     }
+    containers.removeIf(c -> c.getDepth() >= depth);
     if (isContainer(schema.type())) {
-      containers.removeIf(c -> c.getDepth() >= depth);
       String path = containers.stream().map(Container::getContainerName).map(String::toLowerCase).collect(Collectors.joining("."));
 
       if (schema.type() == Schema.Type.STRUCT) {

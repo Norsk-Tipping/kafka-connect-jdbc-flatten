@@ -135,7 +135,44 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
           .field("record2", RECORDTWO)
           .build();
 
+  private static final Schema SALESKEY = SchemaBuilder.struct().name("salesKey")
+          .field("salesNo", Schema.STRING_SCHEMA)
+          .field("customerNo", Schema.STRING_SCHEMA)
+          .build();
 
+  private static final Schema EMPLOYEE = SchemaBuilder.struct()
+          .field("id", Schema.STRING_SCHEMA)
+          .field("departmentNo", Schema.STRING_SCHEMA)
+          .field("mobile", Schema.STRING_SCHEMA)
+          .build();
+
+  private static final Schema STAFF = SchemaBuilder.struct()
+          .field("supportType", Schema.STRING_SCHEMA)
+          .field("employee", EMPLOYEE)
+          .build();
+
+  private static final Schema PRODUCTCODES = SchemaBuilder.array(Schema.STRING_SCHEMA).optional().defaultValue(null)
+          .build();
+
+  private static final Schema PAYMENT = SchemaBuilder.struct()
+          .field("sumPayed", Schema.STRING_SCHEMA)
+          .field("id", Schema.STRING_SCHEMA)
+          .field("productCodes", PRODUCTCODES)
+          .build();
+
+  private static final Schema STAFFARRAY = SchemaBuilder.array(STAFF).optional().defaultValue(null)
+          .build();
+
+  private static final Schema SALESINFO = SchemaBuilder.struct()
+          .field("id", Schema.STRING_SCHEMA)
+          .field("staff", STAFFARRAY)
+          .build();
+
+  private static final Schema SALESEVENT = SchemaBuilder.struct().name("salesEvent")
+          .field("payment", PAYMENT)
+          .field("companyNo", Schema.STRING_SCHEMA)
+          .field("salesInfo", SALESINFO)
+          .build();
 
   @Before
   public void setUp() throws IOException, SQLException {
@@ -1658,6 +1695,77 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     ));
     task.put(Collections.singleton(
             new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, MAINRECORD, mainrecordb, 43)
+    ));
+
+  }
+  @Test
+  public void putSalesExample() throws Exception {
+    Map<String, String> props = new HashMap<>();
+    props.put("connection.url", postgresHelper.postgreSQL());
+    props.put("auto.create", "true");
+    props.put("auto.evolve", "true");
+
+    props.put("connection.user", "postgres");
+    props.put("connection.password", "password123");
+    String timeZoneID = "Europe/Oslo";
+    props.put("db.timezone", timeZoneID);
+    props.put("flatten", "true");
+
+
+    JdbcSinkTask task = new JdbcSinkTask();
+    task.initialize(mock(SinkTaskContext.class));
+
+    task.start(props);
+
+    final Struct salesKey1 = new Struct(SALESKEY)
+            .put("salesNo", "132323")
+            .put("customerNo", "9789789");
+
+    final Struct employee1_1 = new Struct(EMPLOYEE)
+            .put("id", "232323")
+            .put("departmentNo", "34334")
+            .put("mobile", "+47 232334")
+            ;
+
+    final Struct staff1_1 = new Struct(STAFF)
+            .put("supportType", "marketing")
+            .put("employee", employee1_1)
+            ;
+    final Struct employee1_2 = new Struct(EMPLOYEE)
+            .put("id", "3442")
+            .put("departmentNo", "2781")
+            .put("mobile", "+47 990332")
+            ;
+    final Struct staff1_2 = new Struct(STAFF)
+            .put("supportType", "sales")
+            .put("employee", employee1_2)
+            ;
+
+    final ArrayList<Struct> staffArray1 = new ArrayList<>(Arrays.asList(staff1_1, staff1_2));
+
+    final Struct salesInfo1 = new Struct(SALESINFO)
+            .put("id", "1112")
+            .put("staff", staffArray1)
+            ;
+
+    final ArrayList<String> productcodes = new ArrayList<>( Arrays.asList("codeX", "codeY", "codeZ"));
+
+    final Struct payment1 = new Struct(PAYMENT)
+            .put("sumPayed", "1009.05")
+            .put("id", "XZ-ZZSD23")
+            .put("productCodes", productcodes)
+            ;
+
+    final Struct salesEvent1 = new Struct(SALESEVENT)
+            .put("payment", payment1)
+            .put("companyNo", "NO-122")
+            .put("salesInfo", salesInfo1)
+            ;
+
+    final String topic = "Sales";
+
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent1, 1)
     ));
 
   }

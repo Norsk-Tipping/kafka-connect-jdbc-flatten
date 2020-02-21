@@ -14,10 +14,14 @@ https://www.confluent.io/hub/confluentinc/kafka-connect-jdbc.
 
 ## flatten
 default `false`
+<p>
+    <img src="readme_pics/flatten.png" alt="flatten config parameter image"
+    	title="flatten config parameter" width="150" height="100" />
+</p>
 
     Whether to automatically flatten arrays or maps and write their values to seperate
     destination tables based on array/map value schema.
-    
+
 ## flatten.coordinates
 default `false`
 
