@@ -1704,7 +1704,7 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     props.put("connection.url", postgresHelper.postgreSQL());
     props.put("auto.create", "true");
     props.put("auto.evolve", "true");
-
+    props.put("flatten.coordinates", "true");
     props.put("connection.user", "postgres");
     props.put("connection.password", "password123");
     String timeZoneID = "Europe/Oslo";

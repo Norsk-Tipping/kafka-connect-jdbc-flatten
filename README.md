@@ -24,7 +24,10 @@ default `false`
 
 ## flatten.coordinates
 default `false`
-
+<p>
+    <img src="readme_pics/flatten_coordinates.png" alt="flatten.coordinates config parameter image"
+    	title="flatten coordinates config parameter" width="150" height="100" />
+</p>
     Whether to store topic, partition, offset in each of the target tables when flatten is enabled. 
     This can be handy to join data from several target tables that belong to the same record.
 
