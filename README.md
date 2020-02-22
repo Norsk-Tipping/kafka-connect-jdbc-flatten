@@ -61,25 +61,24 @@ default ` `
     	title="flatten rename fields config parameter" width="150" height="100" />
 </p>
 
-     Whether to rename fields when flattening is enabled with enlisted mapping pairs <old name>:<new name>.
-     The old name of the fields are to be referenced by: suffix of root schema name (if absent the word root is used),
+     Whether to rename fields when flattening is enabled with enlisted mapping pairs <original name>:<new name>.
+     The original name of the fields are to be referenced by: suffix of root schema name (if absent the word root is used),
      followed by the subpath of fieldnames.
      All of these are to be seperated by dot ('.').
      
 ## flatten.rename_tables
 default ` `
+<p>
+    <img src="readme_pics/flatten_rename_tables.png" alt="flatten.rename_tables config parameter image"
+    	title="flatten rename tables config parameter" width="150" height="100" />
+</p>
 
-     Whether to rename tables with enlisted mapping pairs <old name>:<new name>.
-     Old table names are specified as topic name, followed by the 
+     Whether to rename tables with enlisted mapping pairs <original name>:<new name>.
+     Original table names are specified as topic name, followed by the 
      suffix of the root schema name (if absent the word root is used), 
-     followed by the subpath of the record container paths
+     followed by the subpath of the field paths
      within the hierarchical value structure.
-     All of these are to be seperated by the configured flatten.delimiter (default '_').
-     e.g.
-     A main struct with a name com.example.Mainrecord that has a field that contains an array and is named array1FieldName
-     would create two target tables that can be renamed as follows.
-     "topicName_mainrecord:targetTableNameX, 
-     topicName_mainrecord_array1FieldName:targetTableNameY" 
+     All of these are to be seperated by the configured flatten.delimiter (default '_'). 
      
 
 ## flatten.uppercase
