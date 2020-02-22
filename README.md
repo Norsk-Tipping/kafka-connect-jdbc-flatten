@@ -56,15 +56,15 @@ default `_`
 
 ## flatten.rename_fields
 default ` `
+<p>
+    <img src="readme_pics/flatten_rename_fields.png" alt="flatten.rename_fields config parameter image"
+    	title="flatten rename fields config parameter" width="150" height="100" />
+</p>
 
      Whether to rename fields when flattening is enabled with enlisted mapping pairs <old name>:<new name>.
      The old name of the fields are to be referenced by: suffix of root schema name (if absent the word root is used),
      followed by the subpath of fieldnames.
      All of these are to be seperated by dot ('.').
-     e.g.
-     A main structure which carries a name com.example.person that contains a structure called record2again within 
-     another structure called record2, with respective fields firstname and modified, are renamed to fn and r2m as follows:
-     "person.firstname:fn, person.record2.record2again.modified:r2am" 
      
 ## flatten.rename_tables
 default ` `

@@ -687,12 +687,12 @@ public class FlattenTransformation {
   }
 
   private String ucase(String string) {
-    return config.flattenUppercase ? string.toUpperCase() : string.toLowerCase();
+      return config.flattenUppercase ? string.toUpperCase() : string.toLowerCase();
   }
 
   private String fullPathDelimiter(String path, String fieldName, boolean fullPath) {
     if (config.flattenfieldrenames.get(path + "." + fieldName.toLowerCase()) != null) {
-      return config.flattenfieldrenames.get(path + "." + fieldName);
+      return config.flattenfieldrenames.get(path + "." + fieldName.toLowerCase());
     }
     if (fullPath) {
       return ucase(path.replace(".", config.flattenDelimiter) + config.flattenDelimiter + fieldName);
