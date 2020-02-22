@@ -28,19 +28,28 @@ default `false`
     <img src="readme_pics/flatten_coordinates.png" alt="flatten.coordinates config parameter image"
     	title="flatten coordinates config parameter" width="150" height="100" />
 </p>
+
     Whether to store topic, partition, offset in each of the target tables when flatten is enabled. 
     This can be handy to join data from several target tables that belong to the same record.
 
 ## flatten.coordinates.fields
 default `kafkatopic, kafkapartition, "kafkaoffset, kafkatimestamp, kafkatimestamp_type`
+<p>
+    <img src="readme_pics/flatten_coordinates_fields.png" alt="flatten.coordinates.fields config parameter image"
+    	title="flatten coordinates fields config parameter" width="150" height="100" />
+</p>
 
      List of comma-separated kafka metadata field names. If empty, 
      the defaults: kafkatopic, kafkapartition, kafkaoffset, 
-     kafkatimestamp will be used. Note that flatten.coordinates must be set to true 
+     kafkatimestamp, kafkatimestamp_type will be used. Note that flatten.coordinates must be set to true 
      to propagate the record metadata to the sink. 
 
 ## flatten.delimiter
 default `_`
+<p>
+    <img src="readme_pics/flatten_delimiter.png" alt="flatten.delimiter config parameter image"
+    	title="flatten delimiter config parameter" width="150" height="100" />
+</p>
 
      Symbol used to concatenate flattened record fields and table names when flatten is enabled.
      By default "_" will be used. 

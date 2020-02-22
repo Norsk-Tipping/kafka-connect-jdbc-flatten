@@ -85,7 +85,8 @@ public class JdbcDbWriter {
               //flattened record schema. So for example one for each array contained in the structure.
               //This also allows for multiple schemas on a single topic without flushing on each subsequent connect record being a different schema on the same topic
               //e.g. support for subject name strategy
-              String fullTableName = fr.topic().toLowerCase() + "_" + fr.valueSchema().name().replaceAll("\\.", "_").toLowerCase();
+              String fullTableName = fr.topic().toLowerCase() + config.flattenDelimiter +
+                      fr.valueSchema().name().replaceAll("\\.", config.flattenDelimiter).toLowerCase();
               //Replace dots that are used throughout FlattenTransformation to define paths within nested structures with configDelimiter to be database-friendly
               substructTableId = destinationTable(config.flattenUppercase ? fullTableName.toUpperCase() : fullTableName.toLowerCase());
               //if flatten.rename_tables contains table names to replace with a different
@@ -148,8 +149,8 @@ public class JdbcDbWriter {
                         try {
                           String ucaseValue = config.flattenUppercase ? value.toUpperCase() : value.toLowerCase();
                           dbDialect.tableIds(connection).stream().filter(tableID -> tableID.tableName().equals(ucaseValue))
-                                  .forEach(tableId -> renamedTableIdList.add(Pair.with(config.flattenUppercase ? key.replaceAll("\\.", "_").toUpperCase() :
-                                          key.replaceAll("\\.", "_").toLowerCase(), tableId)));
+                                  .forEach(tableId -> renamedTableIdList.add(Pair.with(config.flattenUppercase ? key.replaceAll("\\.", config.flattenDelimiter).toUpperCase() :
+                                          key.replaceAll("\\.", config.flattenDelimiter).toLowerCase(), tableId)));
                         } catch (SQLException e) {
                           e.printStackTrace();
                         }
