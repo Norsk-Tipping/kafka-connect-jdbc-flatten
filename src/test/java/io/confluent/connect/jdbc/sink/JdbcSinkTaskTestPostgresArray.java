@@ -1710,7 +1710,7 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     String timeZoneID = "Europe/Oslo";
     props.put("db.timezone", timeZoneID);
     props.put("flatten", "true");
-    props.put("flatten.rename_tables", "sales_salesevent:a, sales_salesevent_salesinfo_staff:b, sales_salesevent_payment_productcodes:c");
+    props.put("flatten.containers.whitelist", "salesevent.salesinfo.staff.staff, salesevent.salesinfo.staff.staff.employee, salesevent.payment.productcodes");
     JdbcSinkTask task = new JdbcSinkTask();
     task.initialize(mock(SinkTaskContext.class));
 

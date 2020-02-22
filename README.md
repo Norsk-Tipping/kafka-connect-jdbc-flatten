@@ -83,22 +83,26 @@ default ` `
 
 ## flatten.uppercase
 default `false`
+<p>
+    <img src="readme_pics/flatten_uppercase.png" alt="flatten.uppercase config parameter image"
+    	title="flatten uppercase config parameter" width="150" height="100" />
+</p>
 
-     Whether to automatically apply uppercase to columns when flatten is enabled.
+     Whether to automatically apply uppercase to column names and table names when flatten is enabled.
      When set to false, lowercase will be applied.
 
 ## flatten.containers.whitelist
 default ` `
+<p>
+    <img src="readme_pics/flatten_containers_whitelist.png" alt="flatten.containers.whitelist config parameter image"
+    	title="flatten containers whitelist config parameter" width="150" height="100" />
+</p>
 
-     List of comma-separated record container paths. If empty, all containers and subcontainers are 
+     List of comma-separated container paths. If empty, all containers and subcontainers are 
      utilized, otherwise used to filter to the desired containers within the hierarchical value structure.
      The containers are to be referenced by: suffix of root schema name (if absent the word root is used), 
      followed by the subpath of fieldnames that lead to the container that is to be whitelisted.
      All of these are to be seperated by dot ('.')."
-     e.g. 
-     A main structure which carries a name com.example.person that contains a structure called record2again within 
-     another structure called record2 are whitelisted as follows:
-     "person, person.record2.record2again"
      
 ## flatten.instruction_cache_size
 default `100`
