@@ -77,16 +77,6 @@ public class FlattenTransformation {
     final String timestampType = record.timestampType().name;
     log.debug("FlattenTransformation.timestampType: {}", timestampType);
 
-    //If config.flattencoordinates) is configured, the kafka coordinates are put in a map to allow these to propagate to
-    //flattened substructures e.g. get inserted in each target table.
-    HashMap<String, Object> propagateFields = new HashMap<>();
-    if (config.flattencoordinates) {
-      propagateFields.put(ucase(config.flattencoordinatenames.get(0)), topic);
-      propagateFields.put(ucase(config.flattencoordinatenames.get(1)), partition);
-      propagateFields.put(ucase(config.flattencoordinatenames.get(2)), offset);
-      propagateFields.put(ucase(config.flattencoordinatenames.get(3)), timestamp);
-      propagateFields.put(ucase(config.flattencoordinatenames.get(4)), timestampType);
-    }
     //Get cached 'flattening' instructions or, if the cache is empty, the cache implementaion triggers execution of
     //getMainProcessingInstructions(schemapair) to create a list of instructions for this schema pair.
     final List<MainProcessingInstruction> processInstructions;
@@ -106,7 +96,21 @@ public class FlattenTransformation {
               //Execute the main container instruction, applied with the map of propagated kafkacoordinates if any and the record value.
               //this instruction will extract the relevant subcontainer (called main container as it becomes the new root container for the respective target table),
               // that is to be written to a seperate target table, from the nested record value.
-              return pi.getMainContainerFunction().apply(Stream.of(new Pair<>(propagateFields, record.value())))
+              return pi.getMainContainerFunction().apply(Stream.of(new Pair<>(
+                      //If config.flattencoordinates) is configured, the kafka coordinates are put in a map to allow these to propagate to
+                      //flattened substructures e.g. get inserted in each target table.
+                      config.flattencoordinates ?
+                              new HashMap<String, Object>() {
+                                {
+                                  put(ucase(config.flattencoordinatenames.get(0)), topic);
+                                  put(ucase(config.flattencoordinatenames.get(1)), partition);
+                                  put(ucase(config.flattencoordinatenames.get(2)), offset);
+                                  put(ucase(config.flattencoordinatenames.get(3)), timestamp);
+                                  put(ucase(config.flattencoordinatenames.get(4)), timestampType);
+                                }
+                              }:
+                              new HashMap<>()
+                      , record.value())))
                       .flatMap(mc -> {
                         log.debug("FlattenTransformation.transform main container {}", mc);
                         //Execute the subprocessing instructions on the relevant subcontainer which results in a flat struct
@@ -191,7 +195,7 @@ public class FlattenTransformation {
               //flagged as containsPkField and have been added as references from the respective container. Here they get collected in pkFIelds
               //and a new targetname gets set for these fields that corresponds to the full container path that leads to the respective entry
               //within the structure. This assures uniqueness and prevents collision with fields existing in substructures when such pkFIelds
-              //propagate down to substructures from arent structures.
+              //propagate down to substructures from parent structures.
               ArrayList<Entry> pkFields = c.getKey().stream().filter(Container::containsPkField)
                       .flatMap(container -> container.getPkFields().stream())
                       .peek(f -> f.setTargetName(ucase(fullPathDelimiter(f.getPath(), f.getFieldName(), true)))).collect(Collectors.toCollection(ArrayList::new));
@@ -539,7 +543,7 @@ public class FlattenTransformation {
                 .apply(p.getValue1())
                 //For each subcontainer entry
                 .forEach(sc ->
-                        //Define the function that extracts firlds with help of getFieldValuesFunction
+                        //Define the function that extracts fields with help of getFieldValuesFunction
                         //by giving it the type of subcontainer and contained entries as information
                         getFieldValuesFunction(key.get(key.size() - 1).getType(), value).apply(sc)
                                 .forEach(fp ->

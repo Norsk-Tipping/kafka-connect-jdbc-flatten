@@ -8,7 +8,7 @@ their own target tables.
 The connector extends the Confluent jdbc sink connector:
 https://github.com/confluentinc/kafka-connect-jdbc
 
-##Config parameters:
+## Config parameters:
 The following lists configuration options of the connector that are in addition to the configuration parameters listed at
 https://www.confluent.io/hub/confluentinc/kafka-connect-jdbc.
 
@@ -124,22 +124,20 @@ default `none`
      
 ## pk.fields
 default ` `
+<p>
+    <img src="readme_pics/pk_fields.png" alt="pk.fields config parameter image"
+    	title="pk fields config parameter" width="150" height="100" />
+</p>
 
      When pk.mode is set to "flatten", all fields from the key struct and value struct that match will be used.
      Fields from the record key that match are to be propagate down to each target table and shall be constrained as
-     (composed) primary key.
+     (composed) primary key in all target tables.
      Fields from the record value that match are NOT to be propagate down to each target table but shall be constrained as
      (composed) primary key in the specific target table."
      
      The fields are to be referenced by: suffix of root schema name (if absent the word root is used), 
      followed by the subpath of fieldnames.
      All of these are to be seperated by dot ('.').
-     e.g.
-     A record with a key that contains a structure which carries a name com.example.personkey with a field named
-     keyInt that is configured as primary key.
-     A value that contains a main structure which carries a name com.example.person and within it 
-     a field named address that contains an array with within it a field named street. 
-     "person.address.address.street, personkey.keyint"
      
      In case the key schema is not a structure but a primitive it is referenced as:
      suffix of root schema name (if absent the word root is used) + "." + "key"
@@ -147,6 +145,10 @@ default ` `
  
 ## flatten.pk_propagate_value_fields
 default ` `
+<p>
+    <img src="readme_pics/pk_fields.png" alt="pk.fields config parameter image"
+    	title="pk fields config parameter" width="150" height="100" />
+</p>
 
      When pk.mode is set to "flatten", this configuration is used as a ist of comma-separated primary key field paths.
      Listed fields will propagate down to any flattened subcontainers lower in the hierarchy path as primary key.
@@ -154,9 +156,6 @@ default ` `
      The fields are to be referenced by: suffix of root schema name (if absent the word root is used), 
      followed by the subpath of fieldnames.
      All of these are to be seperated by dot ('.').
-     
-     e.g. "mainrecord.fieldnameXinMainstruct, mainrecord.array2.array2.fieldnameYinStructBehindArray, 
-     mainrecord.record2.array3.array3.fieldnameZinStructBehindArrayBehindStruct"
 
 ## delete.enabled
 default `false`

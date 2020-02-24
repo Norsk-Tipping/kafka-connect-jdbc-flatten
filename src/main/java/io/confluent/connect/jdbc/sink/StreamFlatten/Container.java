@@ -90,6 +90,7 @@ class Container {
             ", depth=" + depth +
             ", type=" + type +
             ", optional=" + isOptional +
+            ", containsPkField=" + containsPkField +
             '}';
   }
 }
