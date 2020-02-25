@@ -159,6 +159,10 @@ default ` `
 
 ## delete.enabled
 default `false`
+<p>
+    <img src="readme_pics/delete_enabled.png" alt="delete.enabled config parameter image"
+    	title="delete enabled config parameter" width="150" height="100" />
+</p>
 
      Whether to treat null record values as deletes. 
      Requires flatten as pk.mode and a unique field from the record key to be configured in pk.fields.
