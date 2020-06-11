@@ -1602,7 +1602,7 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     props.put("flatten.uppercase", "false");
     props.put("insert.mode", "upsert");
     props.put("flatten.pk_propagate_value_fields", "mainrecord.string1, mainrecord.array2.array2.float, mainrecord.record2.array3.array3.long");
-    props.put("pk.fields", "personkey.keyint");
+    props.put("pk.fields", "personkey.keyint, mainrecord.array1.array1");
     props.put("flatten.rename_tables", "biggerstruct_mainrecord:biggerstruct_mr, biggerstruct_mainrecord_array1:biggerstruct_array1" +
             ",biggerstruct_mainrecord_array2:biggerstruct_array2,biggerstruct_mainrecord_record2_array3:biggerstruct_array3");
 
@@ -1662,7 +1662,7 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
             .put("float", (float) 98232.3)
             .put("double", 0.0)
             ;
-    final ArrayList<Integer> array1b = new ArrayList<>(Arrays.asList(0, 0));
+    final ArrayList<Integer> array1b = new ArrayList<>(Arrays.asList(0, 2));
     final ArrayList<Struct> array2b = new ArrayList<>( Arrays.asList(struct3_1b, struct3_2b));
     final Struct struct4_1b = new Struct(RECORDFOUR)
             .put("long", 123L)
@@ -1690,6 +1690,15 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
             .put("array2", array2b)
             .put("record2", record2b);
 
+    String tableName1 = "biggerstruct_mr";
+    String tableName2 = "biggerstruct_array1";
+    String tableName3 = "biggerstruct_array2";
+    String tableName4 = "biggerstruct_array3";
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
+    tablesUsed.add(tableName4);
+
     task.put(Collections.singleton(
             new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, MAINRECORD, mainrecord, 42)
     ));
@@ -1698,8 +1707,9 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     ));
 
   }
+
   @Test
-  public void putSalesExample() throws Exception {
+  public void putSalesExampleUpsert() throws Exception {
     Map<String, String> props = new HashMap<>();
     props.put("connection.url", postgresHelper.postgreSQL());
     props.put("auto.create", "true");
@@ -1710,9 +1720,11 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     String timeZoneID = "Europe/Oslo";
     props.put("db.timezone", timeZoneID);
     props.put("flatten", "true");
+    props.put("insert.mode", "upsert");
     props.put("pk.mode", "flatten");
-    props.put("pk.fields", "saleskey.salesno,salesevent.payment.productcodes.productcodes, salesevent.salesinfo.id, salesevent.salesinfo.staff.staff.employee.id");
+    props.put("pk.fields", "saleskey.salesno, salesevent.payment.productcodes.productcodes, salesevent.salesinfo.id, salesevent.salesinfo.staff.staff.employee.id");
     props.put("flatten.pk_propagate_value_fields", "salesevent.payment.id");
+    props.put("flatten.uppercase", "false");
     JdbcSinkTask task = new JdbcSinkTask();
     task.initialize(mock(SinkTaskContext.class));
 
@@ -1763,11 +1775,241 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
             .put("salesInfo", salesInfo1)
             ;
 
-    final String topic = "Sales";
+    final Struct salesInfo2 = new Struct(SALESINFO)
+            .put("id", "1112")
+            .put("staff", null)
+            ;
 
+    final Struct payment2 = new Struct(PAYMENT)
+            .put("sumPayed", "1009.05")
+            .put("id", "XZ-ZZSD23")
+            .put("productCodes", null)
+            ;
+
+    final Struct salesEvent2 = new Struct(SALESEVENT)
+            .put("payment", payment2)
+            .put("companyNo", "NO-122")
+            .put("salesInfo", salesInfo2)
+            ;
+
+    final Struct employee3_1 = new Struct(EMPLOYEE)
+            .put("id", "232323")
+            .put("departmentNo", "34334")
+            .put("mobile", "+47 232334")
+            ;
+
+    final Struct staff3_1 = new Struct(STAFF)
+            .put("supportType", "marketing")
+            .put("employee", employee3_1)
+            ;
+
+
+    final ArrayList<Struct> staffArray3 = new ArrayList<>(Arrays.asList(staff3_1));
+
+    final Struct salesInfo3 = new Struct(SALESINFO)
+            .put("id", "1112")
+            .put("staff", staffArray3)
+            ;
+
+    final ArrayList<String> productcodes3 = new ArrayList<>( Arrays.asList("codeX"));
+
+    final Struct payment3 = new Struct(PAYMENT)
+            .put("sumPayed", "1009.05")
+            .put("id", "XZ-ZZSD23")
+            .put("productCodes", productcodes3)
+            ;
+
+    final Struct salesEvent3 = new Struct(SALESEVENT)
+            .put("payment", payment3)
+            .put("companyNo", "NO-122")
+            .put("salesInfo", salesInfo3)
+            ;
+
+    final String topic = "Sales";
+    String tableName1 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)).toLowerCase();
+    String tableName2 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_salesinfo_staff").toLowerCase();
+    String tableName3 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_payment_productcodes").toLowerCase();
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
     task.put(Collections.singleton(
             new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent1, 1)
     ));
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent2, 2)
+    ));
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent3, 3)
+    ));
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName3 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+
+  }
+  @Test
+  public void putSalesExampleUpsertRecordKeyPk() throws Exception {
+    Map<String, String> props = new HashMap<>();
+    props.put("connection.url", postgresHelper.postgreSQL());
+    props.put("auto.create", "true");
+    props.put("auto.evolve", "true");
+    props.put("flatten.coordinates", "true");
+    props.put("connection.user", "postgres");
+    props.put("connection.password", "password123");
+    String timeZoneID = "Europe/Oslo";
+    props.put("db.timezone", timeZoneID);
+    props.put("flatten", "true");
+    props.put("insert.mode", "upsert");
+    props.put("pk.mode", "record_key");
+    props.put("pk.fields", "salesNo");
+    props.put("flatten.pk_propagate_value_fields", "salesevent.payment.id");
+    props.put("flatten.uppercase", "false");
+    JdbcSinkTask task = new JdbcSinkTask();
+    task.initialize(mock(SinkTaskContext.class));
+
+    task.start(props);
+
+    final Struct salesKey1 = new Struct(SALESKEY)
+            .put("salesNo", "132323")
+            .put("customerNo", "9789789");
+
+    final Struct employee1_1 = new Struct(EMPLOYEE)
+            .put("id", "232323")
+            .put("departmentNo", "34334")
+            .put("mobile", "+47 232334")
+            ;
+
+    final Struct staff1_1 = new Struct(STAFF)
+            .put("supportType", "marketing")
+            .put("employee", employee1_1)
+            ;
+
+    final ArrayList<Struct> staffArray1 = new ArrayList<>(Arrays.asList(staff1_1));
+
+    final Struct salesInfo1 = new Struct(SALESINFO)
+            .put("id", "1112")
+            .put("staff", staffArray1)
+            ;
+
+    final ArrayList<String> productcodes = new ArrayList<>( Arrays.asList("codeZ"));
+
+    final Struct payment1 = new Struct(PAYMENT)
+            .put("sumPayed", "1009.05")
+            .put("id", "XZ-ZZSD23")
+            .put("productCodes", productcodes)
+            ;
+
+    final Struct salesEvent1 = new Struct(SALESEVENT)
+            .put("payment", payment1)
+            .put("companyNo", "NO-122")
+            .put("salesInfo", salesInfo1)
+            ;
+    final Struct employee2_1 = new Struct(EMPLOYEE)
+            .put("id", "101")
+            .put("departmentNo", "99")
+            .put("mobile", "+47 221122")
+    ;
+    final Struct staff2_1 = new Struct(STAFF)
+            .put("supportType", "communications")
+            .put("employee", employee2_1)
+            ;
+    final ArrayList<Struct> staffArray2 = new ArrayList<>(Arrays.asList(staff2_1));
+    final Struct salesInfo2 = new Struct(SALESINFO)
+            .put("id", "9999")
+            .put("staff", staffArray2)
+            ;
+    final ArrayList<String> productcodes2 = new ArrayList<>( Arrays.asList("codeB"));
+
+    final Struct payment2 = new Struct(PAYMENT)
+            .put("sumPayed", "1010.05")
+            .put("id", "AA-AAAAA")
+            .put("productCodes", productcodes2)
+            ;
+
+    final Struct salesEvent2 = new Struct(SALESEVENT)
+            .put("payment", payment2)
+            .put("companyNo", "UK-12")
+            .put("salesInfo", salesInfo2)
+            ;
+
+    final String topic = "Sales";
+    String tableName1 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)).toLowerCase();
+    String tableName2 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_salesinfo_staff").toLowerCase();
+    String tableName3 = (topic + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_payment_productcodes").toLowerCase();
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent1, 1)
+    ));
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent2, 2)
+    ));
+
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName3 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
 
   }
 }

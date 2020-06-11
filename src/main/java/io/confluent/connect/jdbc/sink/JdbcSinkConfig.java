@@ -703,6 +703,11 @@ public class JdbcSinkConfig extends AbstractConfig {
     //flatten arrays boolean
     flatten = getBoolean(FLATTEN);
     //FLATTEN:
+    if (flatten && !(insertMode == InsertMode.UPSERT || insertMode == InsertMode.INSERT)) {
+      throw new ConfigException(
+              "Flatten only supports insert modes upsert and insert");
+    }
+    //FLATTEN:
     //coordinates boolean
     flattencoordinates = getBoolean(COORDINATES);
     //FLATTEN:

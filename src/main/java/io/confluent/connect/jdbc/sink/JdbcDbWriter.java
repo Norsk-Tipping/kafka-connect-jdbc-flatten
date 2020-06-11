@@ -16,18 +16,20 @@
 package io.confluent.connect.jdbc.sink;
 
 import io.confluent.connect.jdbc.sink.StreamFlatten.FlattenTransformation;
+import io.confluent.connect.jdbc.sink.StreamFlatten.KeyCoordinate;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.util.CachedConnectionProvider;
@@ -61,7 +63,7 @@ public class JdbcDbWriter {
 
   void write(final Collection<SinkRecord> records) throws SQLException {
     final Connection connection = cachedConnectionProvider.getConnection();
-
+    HashSet<KeyCoordinate> processedKeysForDelete = new HashSet<>();
     final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
     for (SinkRecord record : records) {
       //FLATTEN:
@@ -73,9 +75,21 @@ public class JdbcDbWriter {
         //Apply the transform function of FlattenTransformation to the record
         //and store each flattened record to its respective buffer
         try {
-          flattenTransformation.transform(record).forEach(fr -> {
+          flattenTransformation.transform(record)
+            .flatMap(fr -> {
+              if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT && fr.valueSchema() != null) {
+                KeyCoordinate keyCoordinate = new KeyCoordinate(fr.valueSchema().name(), fr.kafkaPartition(), fr.kafkaOffset());
+                if (!processedKeysForDelete.contains(keyCoordinate)) {
+                  processedKeysForDelete.add(keyCoordinate);
+                  return Stream.of(new SinkRecord(fr.topic(), fr.kafkaPartition(), fr.keySchema(), fr.key(), fr.valueSchema(), null, fr.kafkaOffset(), fr.timestamp(), fr.timestampType(),
+                                  fr.headers())
+                          , fr);
+                }
+              }
+              return Stream.of(fr);
+            })
+            .forEach(fr -> {
             log.debug("JdbcWriter.write sink record after flattening: " + fr);
-
             //Not a delete
             if (fr.valueSchema() != null) {
               //get the TableId object for the given fullTableName
@@ -127,13 +141,13 @@ public class JdbcDbWriter {
                 buffer.add(fr);
               }
               catch (SQLException e) {
-                e.printStackTrace();
+                log.error("Exception while adding record to BufferedRecords for table {}", substructTableId , e);
                 throw new RuntimeException(e);
               }
             } else {
               //A delete
               //get the TableId object for the given fullTableName
-                if (record.value() == null && config.deleteEnabled && config.pkMode == JdbcSinkConfig.PrimaryKeyMode.FLATTEN && !fr.headers().isEmpty()) {
+                if (fr.valueSchema() == null && config.deleteEnabled  && config.pkMode == JdbcSinkConfig.PrimaryKeyMode.FLATTEN && !fr.headers().isEmpty()) {
                   //Use the topic name to find correct buffer
                   String tableNameStartsWith = config.flattenUppercase ? fr.topic().toUpperCase() : fr.topic().toLowerCase();
                   //If there is no buffer for tableId that matches the topic name
@@ -142,6 +156,8 @@ public class JdbcDbWriter {
                     List<Pair<String, TableId>> renamedTableIdList = new ArrayList<>();
                     //Lookup in the database any tables that match with the topic name
                     try {
+                      System.out.println("GERT " + record.topic());
+                      System.out.println("GERT " + dbStructure.getTableDefns().searchTableId(connection, record.topic()));
                       tableIdList = dbStructure.getTableDefns().searchTableId(connection, record.topic())
                               .stream().map(tableId -> Pair.with(config.flattenUppercase ? tableId.tableName().toUpperCase() : tableId.tableName().toLowerCase()
                                       , tableId)).collect(Collectors.toList());
@@ -152,13 +168,13 @@ public class JdbcDbWriter {
                                   .forEach(tableId -> renamedTableIdList.add(Pair.with(config.flattenUppercase ? key.replaceAll("\\.", config.flattenDelimiter).toUpperCase() :
                                           key.replaceAll("\\.", config.flattenDelimiter).toLowerCase(), tableId)));
                         } catch (SQLException e) {
-                          e.printStackTrace();
+                          log.error("Exception while using DBDialect to get existing tables", e);
                         }
                       });
-                      log.debug("JdbcDbWriter.write renamedTableIdList: ", renamedTableIdList);
+                      log.debug("JdbcDbWriter.write renamedTableIdList: {}", renamedTableIdList);
                       renamedTableIdList.stream().filter(rTib -> !tableIdList.contains(rTib)).forEach(tableIdList::add);
                     } catch (java.net.ConnectException | SQLException e) {
-                      e.printStackTrace();
+                      log.error("Exception while using DBDialect to get existing tables for topic {}",record.topic(), e);
                       throw new RuntimeException(e);
                     }
                     //Impossible to construct DDL from null value
@@ -195,12 +211,11 @@ public class JdbcDbWriter {
                   }
                 }
                 else {
-                  throw new ConnectException("Record value is null, this requires " + JdbcSinkConfig.DELETE_ENABLED
+                  throw new ConnectException("Record value schema is null, this requires " + JdbcSinkConfig.DELETE_ENABLED
                           + " and " + JdbcSinkConfig.PK_MODE + " = " + JdbcSinkConfig.PrimaryKeyMode.FLATTEN
                   + " and fields from the record key to be configured in " + JdbcSinkConfig.PK_FIELDS);
                 }
             }
-
           });
         } catch(RuntimeException | ExecutionException e) {
           e.printStackTrace();

@@ -429,6 +429,73 @@ public class JdbcSinkTaskTestPostgresArrayDelete extends EasyMockSupport {
 
   @Test
   public void putLargerStructureDelete() throws Exception {
+
+    final Schema RECORDTHREE = SchemaBuilder.struct().name("com.example.Record3").version(1)
+            .field("string", Schema.STRING_SCHEMA)
+            .field("float", Schema.OPTIONAL_FLOAT32_SCHEMA)
+            .field("double", Schema.OPTIONAL_FLOAT64_SCHEMA)
+            .build();
+    final Schema RECORDFOUR = SchemaBuilder.struct().name("com.example.Record4").version(1)
+            .field("long", Schema.OPTIONAL_INT64_SCHEMA)
+            .field("modified", Timestamp.SCHEMA)
+            .build();
+    final Schema ARRAYTHREE = SchemaBuilder.array(RECORDFOUR).optional().defaultValue(null)
+            .build();
+    final Schema RECORDTWO = SchemaBuilder.struct().name("com.example.Record2").version(1)
+            .field("string", Schema.STRING_SCHEMA)
+            .field("float", Schema.OPTIONAL_FLOAT32_SCHEMA)
+            .field("double", Schema.OPTIONAL_FLOAT64_SCHEMA)
+            .field("array3", ARRAYTHREE)
+            .build();
+    final Schema ARRAYONE = SchemaBuilder.array(Schema.INT32_SCHEMA).optional().defaultValue(null)
+            .build();
+    final Schema ARRAYTWO = SchemaBuilder.array(RECORDTHREE).optional().defaultValue(null)
+            .build();
+    final Schema MAINRECORD = SchemaBuilder.struct().name("com.example.Mainrecord").version(1)
+            .field("string1", Schema.STRING_SCHEMA)
+            .field("string2", Schema.STRING_SCHEMA)
+            .field("array1", ARRAYONE)
+            .field("array2", ARRAYTWO)
+            .field("record2", RECORDTWO)
+            .build();
+    final Struct struct3_1 = new Struct(RECORDTHREE)
+            .put("string", "string1value")
+            .put("float", (float) 2356.3)
+            .put("double", 0.1)
+            ;
+    final Struct struct3_2 = new Struct(RECORDTHREE)
+            .put("string", "abcde")
+            .put("float", (float) 98232.3)
+            .put("double", 4.1)
+            ;
+    final ArrayList<Integer> array1 = new ArrayList<>(Arrays.asList(12, 199));
+    final ArrayList<Struct> array2 = new ArrayList<>( Arrays.asList(struct3_1, struct3_2));
+    final Struct struct4_1 = new Struct(RECORDFOUR)
+            .put("long", 123L)
+            .put("modified", new Date(1473444402123L))
+            ;
+    final Struct struct4_2 = new Struct(RECORDFOUR)
+            .put("long", 456L)
+            .put("modified", new Date(1476661765323L))
+            ;
+    final Struct struct4_3 = new Struct(RECORDFOUR)
+            .put("long", 789L)
+            .put("modified", new Date(1428261402123L))
+            ;
+    final ArrayList<Struct> array3 = new ArrayList<>( Arrays.asList(struct4_1, struct4_2, struct4_3));
+    final Struct record2 = new Struct(RECORDTWO)
+            .put("string", "sfsf")
+            .put("float", (float) 999923.3)
+            .put("double", 0.1)
+            .put("array3", array3)
+            ;
+    final Struct mainrecord = new Struct(MAINRECORD)
+            .put("string1", "pk")
+            .put("string2", "string2value")
+            .put("array1", array1)
+            .put("array2", array2)
+            .put("record2", record2);
+
     Map<String, String> props = new HashMap<>();
     props.put("connection.url", postgresHelper.postgreSQL());
     props.put("auto.create", "true");
@@ -443,22 +510,84 @@ public class JdbcSinkTaskTestPostgresArrayDelete extends EasyMockSupport {
     props.put("flatten.uppercase", "false");
     props.put("insert.mode", "upsert");
     props.put("flatten.pk_propagate_value_fields", "mainrecord.string1, mainrecord.array2.array2.float, mainrecord.record2.array3.array3.long");
-    props.put("pk.fields", "personkey.keyint");
+    props.put("pk.fields", "personkey.keyint, mainrecord.array1.array1");
     props.put("delete.enabled", "true");
     props.put("flatten.rename_tables", "biggerstruct_mainrecord:biggerstruct_mr, biggerstruct_mainrecord_array1:biggerstruct_array1" +
             ",biggerstruct_mainrecord_array2:biggerstruct_array2,biggerstruct_mainrecord_record2_array3:biggerstruct_array3");
-    final String topic = "biggerstruct";
-    JdbcSinkTask task = new JdbcSinkTask();
-    task.initialize(mock(SinkTaskContext.class));
 
-    task.start(props);
     final Struct keyStruct1 = new Struct(KEYSCHEMA)
             .put("keyInt", 13)
             .put("keyName", "KeyString1");
 
+    final String topic = "biggerstruct";
+    String tableName1 = "biggerstruct_mr";
+    String tableName2 = "biggerstruct_array1";
+    String tableName3 = "biggerstruct_array2";
+    String tableName4 = "biggerstruct_array3";
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
+    tablesUsed.add(tableName4);
+    JdbcSinkTask task = new JdbcSinkTask();
+    task.initialize(mock(SinkTaskContext.class));
+
+    task.start(props);
     task.put(Collections.singleton(
-            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, null, null, 44)
+            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, MAINRECORD, mainrecord, 44)
     ));
+    task.stop();
+    task.start(props);
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, null, null, 45)
+    ));
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName3 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName4 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 0);
+                      }
+                    }
+            )
+    );
 
   }
 

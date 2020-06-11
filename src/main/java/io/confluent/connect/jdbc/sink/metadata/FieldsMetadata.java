@@ -159,7 +159,8 @@ public class FieldsMetadata {
       final JdbcSinkConfig.PrimaryKeyMode pkMode,
       final SchemaPair schemaPair,
       final Headers headers,
-      boolean deleteEnabled
+      boolean deleteEnabled,
+      JdbcSinkConfig.InsertMode insertMode
   ) {
     if (schemaPair.valueSchema != null && schemaPair.valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
@@ -169,12 +170,10 @@ public class FieldsMetadata {
 
     final Set<String> keyFieldNames = new LinkedHashSet<>();
     final Set<String> keyFieldNamesInKey = new LinkedHashSet<>();
-    switch (pkMode) {
-      case FLATTEN:
-        extractFlattenededPk(tableName, schemaPair.keySchema, schemaPair.valueSchema, allFields, keyFieldNames, keyFieldNamesInKey, headers, deleteEnabled);
-        break;
-      default:
-        throw new ConnectException("Unknown primary key mode: " + pkMode);
+    if (pkMode == JdbcSinkConfig.PrimaryKeyMode.FLATTEN) {
+        extractFlattenededPk(tableName, schemaPair.keySchema, schemaPair.valueSchema, allFields, keyFieldNames, keyFieldNamesInKey, headers, deleteEnabled, insertMode);
+    } else {
+      throw new ConnectException("Unknown primary key mode: " + pkMode);
     }
 
     final Set<String> nonKeyFieldNames = new LinkedHashSet<>();
@@ -339,10 +338,11 @@ public class FieldsMetadata {
           final Set<String> keyFieldNames,
           final Set<String> keyFieldNamesInKey,
           final Headers headers,
-          boolean deleteEnabled
+          boolean deleteEnabled,
+          JdbcSinkConfig.InsertMode insertMode
 
   ) {
-    if (valueSchema == null && deleteEnabled) {
+    if (valueSchema == null && (deleteEnabled || insertMode == JdbcSinkConfig.InsertMode.UPSERT)) {
       if (keySchema == null) {
         throw new ConnectException(String.format(
                 "PK mode for table '%s' is %s, but record key schema is missing",
@@ -393,6 +393,7 @@ public class FieldsMetadata {
                 JdbcSinkConfig.PrimaryKeyMode.FLATTEN)
         );
       }
+
       headers.forEach(h -> {
         if (valueSchema.field(h.value().toString()) == null) {
           throw new ConnectException(String.format(
@@ -405,7 +406,7 @@ public class FieldsMetadata {
           if (keySchema != null) {
             if (keySchema.type() == Schema.Type.STRUCT) {
               keySchema.fields().stream().filter(kf -> kf.name().equals(h.key())).forEach(kf -> keyFieldNamesInKey.add(h.value().toString()));
-            } else if (h.key().endsWith("\\.key")) {
+            } else if (h.key().endsWith(".key")) {
               keyFieldNamesInKey.add(h.value().toString());
             }
           }
@@ -422,6 +423,7 @@ public class FieldsMetadata {
   public String toString() {
     return "FieldsMetadata{"
            + "keyFieldNames=" + keyFieldNames
+            + ", keyFieldNamesInKey=" + keyFieldNamesInKey
            + ", nonKeyFieldNames=" + nonKeyFieldNames
            + ", allFields=" + allFields
            + '}';

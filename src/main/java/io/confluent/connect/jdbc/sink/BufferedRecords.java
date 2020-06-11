@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.sink;
 
+import io.confluent.connect.jdbc.sink.StreamFlatten.KeyCoordinate;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -25,11 +26,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
@@ -40,6 +37,7 @@ import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.TableId;
 
 import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.InsertMode.INSERT;
+import static io.confluent.connect.jdbc.sink.JdbcSinkConfig.InsertMode.UPSERT;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
@@ -62,6 +60,7 @@ public class BufferedRecords {
   private StatementBinder deleteStatementBinder;
   private boolean deletesInBatch = false;
   private boolean updatesInBatch = false;
+  private final HashMap<Object, KeyCoordinate> keyCoordinates = new HashMap<>();
 
   public BufferedRecords(
       JdbcSinkConfig config,
@@ -92,10 +91,22 @@ public class BufferedRecords {
         deletesInBatch = true;
       }
     } else if (Objects.equals(valueSchema, record.valueSchema())) {
+      if (config.flatten && config.insertMode == UPSERT) {
+        KeyCoordinate keyCoordinate = new KeyCoordinate(record.valueSchema().name(), record.kafkaPartition(), record.kafkaOffset());
+        if (keyCoordinates.get(record.key()) != null) {
+          if (!keyCoordinates.get(record.key()).equals(keyCoordinate)) {
+            flushed.addAll(flush());
+          }
+        }
+        keyCoordinates.put(record.key(), keyCoordinate);
+      }
       if (config.deleteEnabled && deletesInBatch) {
         // flush so an insert after a delete of same record isn't lost
         updatesInBatch = true;
         flushed.addAll(flush());
+      }
+      else {
+        updatesInBatch = true;
       }
     } else {
       updatesInBatch = true;
@@ -120,7 +131,8 @@ public class BufferedRecords {
                 config.pkMode,
                 schemaPair,
                 record.headers(),
-                config.deleteEnabled
+                config.deleteEnabled,
+                config.insertMode
         );
       }
       else {
@@ -141,6 +153,7 @@ public class BufferedRecords {
       );
       final String insertSql = getInsertSql();
       final String deleteSql = getDeleteSql();
+
       log.debug(
           "{} sql: {} deleteSql: {} meta: {}",
           config.insertMode,
@@ -150,14 +163,27 @@ public class BufferedRecords {
       );
       close();
       updatePreparedStatement = dbDialect.createPreparedStatement(connection, insertSql);
-      updateStatementBinder = dbDialect.statementBinder(
-          updatePreparedStatement,
-          config.pkMode,
-          schemaPair,
-          fieldsMetadata,
-          config.insertMode
-      );
-      if (config.deleteEnabled && nonNull(deleteSql)) {
+      //FLATTEN:
+      if (config.flatten && config.insertMode == UPSERT) {
+        updateStatementBinder = dbDialect.statementBinder(
+                updatePreparedStatement,
+                config.pkMode,
+                schemaPair,
+                fieldsMetadata,
+                INSERT
+        );
+      }
+      else {
+        updateStatementBinder = dbDialect.statementBinder(
+                updatePreparedStatement,
+                config.pkMode,
+                schemaPair,
+                fieldsMetadata,
+                config.insertMode
+        );
+      }
+      //FLATTEN:
+      if (nonNull(deleteSql)) {
         deletePreparedStatement = dbDialect.createPreparedStatement(connection, deleteSql);
         deleteStatementBinder = dbDialect.statementBinder(
             deletePreparedStatement,
@@ -214,6 +240,7 @@ public class BufferedRecords {
 
     final List<SinkRecord> flushedRecords = records;
     records = new ArrayList<>();
+    keyCoordinates.clear();
     deletesInBatch = false;
     updatesInBatch = false;
     return flushedRecords;
@@ -224,15 +251,21 @@ public class BufferedRecords {
    */
   private Optional<Long> executeUpdates() throws SQLException {
     Optional<Long> count = Optional.empty();
-    if (updatesInBatch) {
-      for (int updateCount : updatePreparedStatement.executeBatch()) {
-        if (updateCount != Statement.SUCCESS_NO_INFO) {
-          count = count.isPresent()
-                  ? count.map(total -> total + updateCount)
-                  : Optional.of((long) updateCount);
+      if (config.flatten && config.insertMode == UPSERT){
+        deletesInBatch = true;
+        executeDeletes();
+        deletesInBatch = false;
+      }
+      if (updatesInBatch) {
+        for (int updateCount : updatePreparedStatement.executeBatch()) {
+          if (updateCount != Statement.SUCCESS_NO_INFO) {
+            count = count.isPresent()
+                    ? count.map(total -> total + updateCount)
+                    : Optional.of((long) updateCount);
+          }
         }
       }
-    }
+
     return count;
   }
 
@@ -289,11 +322,20 @@ public class BufferedRecords {
           ));
         }
         try {
-          return dbDialect.buildUpsertQueryStatement(
-              tableId,
-              asColumns(fieldsMetadata.keyFieldNames),
-              asColumns(fieldsMetadata.nonKeyFieldNames)
-          );
+          if (config.flatten) {
+            return dbDialect.buildInsertStatement(
+                    tableId,
+                    asColumns(fieldsMetadata.keyFieldNames),
+                    asColumns(fieldsMetadata.nonKeyFieldNames)
+            );
+          }
+          else {
+            return dbDialect.buildInsertStatement(
+                    tableId,
+                    asColumns(fieldsMetadata.keyFieldNames),
+                    asColumns(fieldsMetadata.nonKeyFieldNames)
+            );
+          }
         } catch (UnsupportedOperationException e) {
           throw new ConnectException(String.format(
               "Write to table '%s' in UPSERT mode is not supported with the %s dialect.",
@@ -314,7 +356,7 @@ public class BufferedRecords {
 
   private String getDeleteSql() {
     String sql = null;
-    if (config.deleteEnabled) {
+    if (config.deleteEnabled || (config.insertMode == UPSERT && config.flatten)) {
       switch (config.pkMode) {
         case RECORD_KEY:
           if (fieldsMetadata.keyFieldNames.isEmpty()) {
@@ -335,7 +377,7 @@ public class BufferedRecords {
           break;
         //FLATTEN:
         case FLATTEN:
-          if (fieldsMetadata.keyFieldNames.isEmpty()) {
+          if (fieldsMetadata.keyFieldNames.isEmpty() || fieldsMetadata.keyFieldNamesInKey == null || fieldsMetadata.keyFieldNamesInKey.isEmpty()) {
             throw new ConnectException("Require primary keys to support delete");
           }
           try {

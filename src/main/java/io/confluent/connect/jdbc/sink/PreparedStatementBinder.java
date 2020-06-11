@@ -130,7 +130,7 @@ public class PreparedStatementBinder implements StatementBinder {
       break;
 
       case FLATTEN: {
-        if (record.valueSchema() == null && fieldsMetadata.keyFieldNamesInKey != null) {
+        if (record.value() == null && fieldsMetadata.keyFieldNamesInKey != null) {
           for (String fieldName : fieldsMetadata.keyFieldNamesInKey) {
             final Field field;
             String origName = null;
