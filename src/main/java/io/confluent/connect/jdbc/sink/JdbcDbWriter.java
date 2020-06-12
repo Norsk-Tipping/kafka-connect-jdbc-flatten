@@ -76,18 +76,6 @@ public class JdbcDbWriter {
         //and store each flattened record to its respective buffer
         try {
           flattenTransformation.transform(record)
-            .flatMap(fr -> {
-              if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT && fr.valueSchema() != null) {
-                KeyCoordinate keyCoordinate = new KeyCoordinate(fr.valueSchema().name(), fr.kafkaPartition(), fr.kafkaOffset());
-                if (!processedKeysForDelete.contains(keyCoordinate)) {
-                  processedKeysForDelete.add(keyCoordinate);
-                  return Stream.of(new SinkRecord(fr.topic(), fr.kafkaPartition(), fr.keySchema(), fr.key(), fr.valueSchema(), null, fr.kafkaOffset(), fr.timestamp(), fr.timestampType(),
-                                  fr.headers())
-                          , fr);
-                }
-              }
-              return Stream.of(fr);
-            })
             .forEach(fr -> {
             log.debug("JdbcWriter.write sink record after flattening: " + fr);
             //Not a delete
@@ -156,8 +144,6 @@ public class JdbcDbWriter {
                     List<Pair<String, TableId>> renamedTableIdList = new ArrayList<>();
                     //Lookup in the database any tables that match with the topic name
                     try {
-                      System.out.println("GERT " + record.topic());
-                      System.out.println("GERT " + dbStructure.getTableDefns().searchTableId(connection, record.topic()));
                       tableIdList = dbStructure.getTableDefns().searchTableId(connection, record.topic())
                               .stream().map(tableId -> Pair.with(config.flattenUppercase ? tableId.tableName().toUpperCase() : tableId.tableName().toLowerCase()
                                       , tableId)).collect(Collectors.toList());

@@ -1875,8 +1875,8 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
                     }
             )
     );
-
   }
+
   @Test
   public void putSalesExampleUpsertRecordKeyPk() throws Exception {
     Map<String, String> props = new HashMap<>();

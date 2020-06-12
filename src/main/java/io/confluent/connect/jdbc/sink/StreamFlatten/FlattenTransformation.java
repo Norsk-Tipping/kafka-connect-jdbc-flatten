@@ -119,13 +119,13 @@ public class FlattenTransformation {
                       })
                       //If any values from the record key are to be propagated to each target table they get added to the structure.
                       .map(pi.getKeyPkFieldFunction().apply(record.key()))
-                      .map(struct -> {
-                        log.debug("FlattenTransformation.transform record value outstruct after flattening: " + struct);
+                      .map(schemaStructPair -> {
+                        log.debug("FlattenTransformation.transform record value outstruct after flattening: " + schemaStructPair.getValue1());
                         //Build a SinkRecord to convey the 'flattened' struct. In case the orginal sinkrecord was null,
                         //the value schema and the value of the target sinkrecord will also be set to null to allow for delete semantics
                         return new SinkRecord(record.topic(), record.kafkaPartition(), record.keySchema(), record.key(),
-                                struct != null ? struct.schema() : null,
-                                struct,
+                                schemaStructPair.getValue0(),
+                                schemaStructPair.getValue1(),
                                 record.kafkaOffset(), record.timestamp(), record.timestampType(), pi.getHeaders());
                       });
             });
@@ -306,9 +306,9 @@ public class FlattenTransformation {
       // but with common header information that carries the record key primary key fields.
       return Collections.singletonList(new MainProcessingInstruction(
                       o -> o,
-                      o -> Stream.of((Struct) null),
+                      o -> Stream.of(new Pair<>(null, null)),
                       commonHeaders,
-                      o -> s -> null
+                      o -> s -> s
               )
       );
     }
@@ -383,7 +383,7 @@ public class FlattenTransformation {
 
   //Return a lambda (that gets cached with the processing instructions)
   // that defines the chain of functions needed to extract the primary key values that are configured to be propagated down from a record key
-  private Function<Object, Function<Struct, Struct>> getKeyPkFieldFunction(List<Entry> keyFieldsPK) {
+  private Function<Object, Function<Pair<Schema, Struct>, Pair<Schema, Struct>>> getKeyPkFieldFunction(List<Entry> keyFieldsPK) {
     if (config.pkMode == JdbcSinkConfig.PrimaryKeyMode.FLATTEN && !keyFieldsPK.isEmpty()) {
       log.debug("FlattenTransformation.getKeyPkFieldFunction pkMode = FLATTEN, keyFields defined are {}",
               keyFieldsPK);
@@ -392,12 +392,12 @@ public class FlattenTransformation {
       if (keyFieldsPK.stream().map(Entry::getContainer).anyMatch(cl -> !cl.isEmpty() && cl.size() == 1 && cl.get(0).getType() == Schema.Type.STRUCT)) {
         log.debug("FlattenTransformation.getKeyPkFieldFunction key schema is a STRUCT, pkFields to be extracted from key value are {}",
                 keyFieldsPK);
-        return keyValue -> struct -> {
-          if (struct == null) {
-            return struct;
+        return keyValue -> schemaStructPair -> {
+          if (schemaStructPair.getValue1() == null) {
+            return schemaStructPair;
           }
-          keyFieldsPK.forEach(kfPK -> struct.put(kfPK.getTargetName(), ((Struct) keyValue).get(kfPK.getFieldName())));
-          return struct;
+          keyFieldsPK.forEach(kfPK -> schemaStructPair.getValue1().put(kfPK.getTargetName(), ((Struct) keyValue).get(kfPK.getFieldName())));
+          return schemaStructPair;
         };
       }
       //Else, previously gathered keyFieldsPK is a single primitive key value, return a lambda that adds the key primary key value to the target Struct
@@ -405,12 +405,12 @@ public class FlattenTransformation {
       else if (keyFieldsPK.size() == 1 && keyFieldsPK.stream().anyMatch(kPK -> kPK.getContainer().isEmpty())) {
         log.debug("FlattenTransformation.getKeyPkFieldFunction key schema is a primitive, pkField to be extracted from key value is {}",
                 keyFieldsPK);
-        return keyValue -> struct -> {
-          if (struct == null) {
-            return struct;
+        return keyValue -> schemaStructPair -> {
+          if (schemaStructPair.getValue1() == null) {
+            return schemaStructPair;
           }
-          struct.put(keyFieldsPK.get(0).getTargetName(), keyValue);
-          return struct;
+          schemaStructPair.getValue1().put(keyFieldsPK.get(0).getTargetName(), keyValue);
+          return schemaStructPair;
         };
       }
     }
@@ -480,14 +480,21 @@ public class FlattenTransformation {
   //Return a lambda (that gets cached with the processing instructions)
   //that defines the chain of functions that need to be applied to extract the fields from any subcontainers based on the gathered
   //information of the type of the main container, the list of subcontainerfields per subcontainer and the final target schema.
-  private Function<Pair<HashMap<String, Object>, Object>, Stream<Struct>> getSubProcessingFunction(Container container, Map<List<Container>, List<Entry>> entries, Schema schema) {
+  private Function<Pair<HashMap<String, Object>, Object>, Stream<Pair<Schema, Struct>>> getSubProcessingFunction(Container container, Map<List<Container>, List<Entry>> entries, Schema schema) {
     //If the main container is a Struct, return a lambda that takes the main container object and propagated value as input and maps this to the final structure
     //with help of getSubContainersAndFieldsFunction that extracts the individual field values.
     if (container.getType() == Schema.Type.STRUCT) {
       return os -> {
         if (os != null && os.getValue1() != null) {
-          return Stream.of(os.getValue1()).map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema));
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.concat(Stream.of(new Pair<>(schema, null)), Stream.of(os.getValue1()).map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema))
+            .map(s -> new Pair<>(schema, s)));
+          }
+          return Stream.of(os.getValue1()).map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s));
         } else {
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.of(new Pair<>(schema, null));
+          }
           return Stream.empty();
         }
       };
@@ -498,8 +505,15 @@ public class FlattenTransformation {
     else if (container.getType() == Schema.Type.ARRAY) {
       return os -> {
         if (os != null && os.getValue1() != null) {
-          return ((ArrayList<Object>) os.getValue1()).stream().map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema));
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.concat(Stream.of(new Pair<>(schema, null)),
+                    ((ArrayList<Object>) os.getValue1()).stream().map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s)));
+          }
+          return ((ArrayList<Object>) os.getValue1()).stream().map(o -> Pair.with(os.getValue0(), o)).map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s));
         } else {
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.of(new Pair<>(schema, null));
+          }
           return Stream.empty();
         }
       };
@@ -511,6 +525,18 @@ public class FlattenTransformation {
     else if (container.getType() == Schema.Type.MAP) {
       return os -> {
         if (os != null && os.getValue1() != null) {
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.concat(Stream.of(new Pair<>(schema, null)),
+                    ((HashMap<String, Object>) os.getValue1()).entrySet().stream()
+                            .map(e -> {
+                              String fieldCase = ucase(fullPathDelimiter(container.getPath() + "." + container.getContainerName(), "key", true));
+                              HashMap<String, Object> mapIncludingKey = new HashMap<>(os.getValue0());
+                              mapIncludingKey.put(fieldCase, e.getKey());
+                              return new Pair<>(mapIncludingKey, e.getValue());
+                            })
+                            .map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s))
+                    );
+          }
           return ((HashMap<String, Object>) os.getValue1()).entrySet().stream()
                   .map(e -> {
                     String fieldCase = ucase(fullPathDelimiter(container.getPath() + "." + container.getContainerName(), "key", true));
@@ -518,8 +544,11 @@ public class FlattenTransformation {
                     mapIncludingKey.put(fieldCase, e.getKey());
                     return new Pair<>(mapIncludingKey, e.getValue());
                   })
-                  .map(getSubContainersAndFieldsFunction(entries, schema));
+                  .map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s));
         } else {
+          if (config.insertMode == JdbcSinkConfig.InsertMode.UPSERT) {
+            return Stream.of(new Pair<>(schema, null));
+          }
           return Stream.empty();
         }
       };
