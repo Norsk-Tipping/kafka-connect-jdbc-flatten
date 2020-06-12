@@ -63,7 +63,6 @@ public class JdbcDbWriter {
 
   void write(final Collection<SinkRecord> records) throws SQLException {
     final Connection connection = cachedConnectionProvider.getConnection();
-    HashSet<KeyCoordinate> processedKeysForDelete = new HashSet<>();
     final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
     for (SinkRecord record : records) {
       //FLATTEN:
