@@ -166,6 +166,24 @@ default `false`
 
      Whether to treat null record values as deletes. 
      Requires flatten as pk.mode and a unique field from the record key to be configured in pk.fields.
+     
+## insert.mode
+default `insert`
+<p>
+    <img src="readme_pics/insert_mode.png" alt="insert.mode config parameter image"
+    	title="insert mode config parameter" width="150" height="100" />
+</p>
+       
+     With insert.mode = insert, flattened records get inserted to their respective target tables. The existing table
+     rows are not changed.
+     With insert.mode = upsert, flattened records result in a two-step operation. First a delete statement for relevant
+     target table is executed to remove any content related to the specific record key primary key that is configured.
+     This requires a unique field from the record key to be configured in pk.fields.
+     In the second step, the new flattened records get inserted to their respective target table.
+     Because the connector operates with batched preparedstatements, if it detects multiple flattened records with the 
+     same key but different coordinates (offset, partition) it executes a flush before continueing with the remainder of
+     the batch.
+     insert.mode = update is not supported byt this connector when flattening is enabled.
 
 # License
 
