@@ -19,7 +19,15 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import io.confluent.connect.jdbc.sink.JdbcSinkConfig;
 import org.apache.kafka.connect.header.Headers;
@@ -93,12 +101,12 @@ public class FieldsMetadata {
   }
 
   public static FieldsMetadata extract(
-          final String tableName,
-          final JdbcSinkConfig.PrimaryKeyMode pkMode,
-          final List<String> configuredPkFields,
-          final Set<String> fieldsWhitelist,
-          final Schema keySchema,
-          final Schema valueSchema
+      final String tableName,
+      final JdbcSinkConfig.PrimaryKeyMode pkMode,
+      final List<String> configuredPkFields,
+      final Set<String> fieldsWhitelist,
+      final Schema keySchema,
+      final Schema valueSchema
   ) {
     if (valueSchema != null && valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
@@ -146,11 +154,37 @@ public class FieldsMetadata {
 
     if (allFields.isEmpty()) {
       throw new ConnectException(
-              "No fields found using key and value schemas for table: " + tableName
+          "No fields found using key and value schemas for table: " + tableName
       );
     }
 
-    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFields);
+    final Map<String, SinkRecordField> allFieldsOrdered = new LinkedHashMap<>();
+    for (String fieldName : JdbcSinkConfig.DEFAULT_KAFKA_PK_NAMES) {
+      if (allFields.containsKey(fieldName)) {
+        allFieldsOrdered.put(fieldName, allFields.get(fieldName));
+      }
+    }
+
+    if (valueSchema != null) {
+      for (Field field : valueSchema.fields()) {
+        String fieldName = field.name();
+        if (allFields.containsKey(fieldName)) {
+          allFieldsOrdered.put(fieldName, allFields.get(fieldName));
+        }
+      }
+    }
+
+    if (allFieldsOrdered.size() < allFields.size()) {
+      ArrayList<String> fieldKeys = new ArrayList<>(allFields.keySet());
+      Collections.sort(fieldKeys);
+      for (String fieldName : fieldKeys) {
+        if (!allFieldsOrdered.containsKey(fieldName)) {
+          allFieldsOrdered.put(fieldName, allFields.get(fieldName));
+        }
+      }
+    }
+
+    return new FieldsMetadata(keyFieldNames, nonKeyFieldNames, allFieldsOrdered);
   }
 
   //FLATTEN:

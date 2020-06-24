@@ -53,6 +53,7 @@ public class BufferedRecords {
   private List<SinkRecord> records = new ArrayList<>();
   private Schema keySchema;
   private Schema valueSchema;
+  private RecordValidator recordValidator;
   private FieldsMetadata fieldsMetadata;
   private PreparedStatement updatePreparedStatement;
   private PreparedStatement deletePreparedStatement;
@@ -74,9 +75,11 @@ public class BufferedRecords {
     this.dbDialect = dbDialect;
     this.dbStructure = dbStructure;
     this.connection = connection;
+    this.recordValidator = RecordValidator.create(config);
   }
 
   public List<SinkRecord> add(SinkRecord record) throws SQLException {
+    recordValidator.validate(record);
     final List<SinkRecord> flushed = new ArrayList<>();
     boolean schemaChanged = false;
     if (!Objects.equals(keySchema, record.keySchema())) {
@@ -84,7 +87,7 @@ public class BufferedRecords {
       schemaChanged = true;
     }
     if (isNull(record.valueSchema())) {
-      // For deletes, both the value and value schema come in as null.
+      // For deletes, value and optionally value schema come in as null.
       // We don't want to treat this as a schema change if key schemas is the same
       // otherwise we flush unnecessarily.
       if (config.deleteEnabled) {
@@ -114,8 +117,7 @@ public class BufferedRecords {
       valueSchema = record.valueSchema();
       schemaChanged = true;
     }
-
-    if (schemaChanged) {
+    if (schemaChanged || updateStatementBinder == null) {
       // Each batch needs to have the same schemas, so get the buffered records out
       flushed.addAll(flush());
 
@@ -194,6 +196,12 @@ public class BufferedRecords {
         );
       }
     }
+    
+    // set deletesInBatch if schema value is not null
+    if (isNull(record.value()) && config.deleteEnabled) {
+      deletesInBatch = true;
+    }
+
     records.add(record);
 
     if (records.size() >= config.batchSize) {
@@ -290,7 +298,7 @@ public class BufferedRecords {
   }
 
   public void close() throws SQLException {
-    log.info(
+    log.debug(
         "Closing BufferedRecords with updatePreparedStatement: {} deletePreparedStatement: {}",
         updatePreparedStatement,
         deletePreparedStatement

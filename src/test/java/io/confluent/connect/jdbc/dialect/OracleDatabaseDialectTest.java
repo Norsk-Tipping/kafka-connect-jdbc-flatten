@@ -96,7 +96,9 @@ public class OracleDatabaseDialectTest extends BaseDialectTest<OracleDatabaseDia
                       "\"c4\" CLOB NULL,\n" + "\"c5\" DATE DEFAULT '2001-03-15',\n" +
                       "\"c6\" DATE DEFAULT '00:00:00.000',\n" +
                       "\"c7\" TIMESTAMP DEFAULT '2001-03-15 00:00:00.000',\n" +
-                      "\"c8\" NUMBER(*,4) NULL,\n" + "PRIMARY KEY(\"c1\"))";
+                      "\"c8\" NUMBER(*,4) NULL,\n" +
+                      "\"c9\" NUMBER(1,0) DEFAULT 1,\n" +
+                      "PRIMARY KEY(\"c1\"))";
     String sql = dialect.buildCreateTableStatement(tableId, sinkRecordFields);
     assertEquals(expected, sql);
   }
@@ -113,7 +115,8 @@ public class OracleDatabaseDialectTest extends BaseDialectTest<OracleDatabaseDia
             "\"c5\" DATE DEFAULT '2001-03-15',\n" +
             "\"c6\" DATE DEFAULT '00:00:00.000',\n" +
             "\"c7\" TIMESTAMP DEFAULT '2001-03-15 00:00:00.000',\n" +
-            "\"c8\" NUMBER(*,4) NULL)"
+            "\"c8\" NUMBER(*,4) NULL,\n" +
+            "\"c9\" NUMBER(1,0) DEFAULT 1)"
         },
         dialect.buildAlterTable(tableId, sinkRecordFields)
     );
@@ -131,7 +134,8 @@ public class OracleDatabaseDialectTest extends BaseDialectTest<OracleDatabaseDia
             "c5 DATE DEFAULT '2001-03-15',\n" +
             "c6 DATE DEFAULT '00:00:00.000',\n" +
             "c7 TIMESTAMP DEFAULT '2001-03-15 00:00:00.000',\n" +
-            "c8 NUMBER(*,4) NULL)"
+            "c8 NUMBER(*,4) NULL,\n" +
+            "c9 NUMBER(1,0) DEFAULT 1)"
         },
         dialect.buildAlterTable(tableId, sinkRecordFields)
     );
@@ -234,6 +238,44 @@ public class OracleDatabaseDialectTest extends BaseDialectTest<OracleDatabaseDia
         + "key2=value2&key3=value3&user=smith&password=secret&other=value",
         "jdbc:oracle:thin:@myhost:1111/db?password=****&key1=value1&"
         + "key2=value2&key3=value3&user=smith&password=****&other=value"
+    );
+  }
+
+  @Test
+  public void shouldSanitizeUrlWithKerberosCredentialsInUrlProperties() {
+    assertSanitizedUrl(
+        "jdbc:oracle:thin:@myhost:1111/db?"
+        + "password=secret&"
+        + "javax.net.ssl.keyStorePassword=secret2&"
+        + "key1=value1&"
+        + "key2=value2&"
+        + "key3=value3&"
+        + "user=smith&"
+        + "password=secret&"
+        + "passworNotSanitized=not-secret&"
+        + "passwordShouldBeSanitized=value3&"
+        + "javax.net.ssl.trustStorePassword=superSecret&"
+        + "OCINewPassword=secret2&"
+        + "oracle.net.wallet_password=secret3&"
+        + "proxy_password=secret4&"
+        + "PROXY_USER_PASSWORD=secret5&"
+        + "other=value",
+        "jdbc:oracle:thin:@myhost:1111/db?"
+        + "password=****&"
+        + "javax.net.ssl.keyStorePassword=****&"
+        + "key1=value1&"
+        + "key2=value2&"
+        + "key3=value3&"
+        + "user=smith&"
+        + "password=****&"
+        + "passworNotSanitized=not-secret&"
+        + "passwordShouldBeSanitized=****&"
+        + "javax.net.ssl.trustStorePassword=****&"
+        + "OCINewPassword=****&"
+        + "oracle.net.wallet_password=****&"
+        + "proxy_password=****&"
+        + "PROXY_USER_PASSWORD=****&"
+        + "other=value"
     );
   }
 }

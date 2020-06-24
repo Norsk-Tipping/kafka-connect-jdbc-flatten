@@ -76,6 +76,8 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
    */
   @Override
   protected void initializePreparedStatement(PreparedStatement stmt) throws SQLException {
+    super.initializePreparedStatement(stmt);
+
     log.trace("Initializing PreparedStatement fetch direction to FETCH_FORWARD for '{}'", stmt);
     stmt.setFetchDirection(ResultSet.FETCH_FORWARD);
   }
@@ -114,7 +116,7 @@ public class MySqlDatabaseDialect extends GenericDatabaseDialect {
       case BOOLEAN:
         return "TINYINT";
       case STRING:
-        return "VARCHAR(256)";
+        return "TEXT";
       case BYTES:
         return "VARBINARY(1024)";
       default:

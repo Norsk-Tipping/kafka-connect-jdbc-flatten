@@ -35,7 +35,6 @@ import org.junit.Test;
 import org.junit.runners.Parameterized;
 import org.mockito.Mock;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -94,7 +93,7 @@ public abstract class BaseDialectTypeTest<T extends GenericDatabaseDialect> {
 
   @SuppressWarnings("deprecation")
   @Test
-  public void testValueConversionOnNumeric() throws Exception {
+  public void testValueConversion() throws Exception {
     when(columnDefn.precision()).thenReturn(precision);
     when(columnDefn.scale()).thenReturn(scale);
     when(columnDefn.type()).thenReturn(columnType);
@@ -123,6 +122,10 @@ public abstract class BaseDialectTypeTest<T extends GenericDatabaseDialect> {
     when(resultSet.getShort(1)).thenReturn(SHORT);
     when(resultSet.getByte(1)).thenReturn(BYTE);
     when(resultSet.getDouble(1)).thenReturn(DOUBLE);
+
+    if (expectedValue instanceof String) {
+      when(resultSet.getString(1)).thenReturn((String)expectedValue);
+    }
 
     // Check the converter operates correctly
     ColumnMapping mapping = new ColumnMapping(columnDefn, 1, field);

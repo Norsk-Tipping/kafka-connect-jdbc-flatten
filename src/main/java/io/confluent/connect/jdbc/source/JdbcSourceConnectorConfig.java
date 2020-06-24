@@ -51,25 +51,33 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceConnectorConfig.class);
 
-  public static final String CONNECTION_URL_CONFIG = "connection.url";
-  private static final String CONNECTION_URL_DOC = "JDBC connection URL.";
+  public static final String CONNECTION_PREFIX = "connection.";
+
+  public static final String CONNECTION_URL_CONFIG = CONNECTION_PREFIX + "url";
+  private static final String CONNECTION_URL_DOC =
+      "JDBC connection URL.\n"
+          + "For example: ``jdbc:oracle:thin:@localhost:1521:orclpdb1``, "
+          + "``jdbc:mysql://localhost/db_name``, "
+          + "``jdbc:sqlserver://localhost;instance=SQLEXPRESS;"
+          + "databaseName=db_name``";
   private static final String CONNECTION_URL_DISPLAY = "JDBC URL";
 
-  public static final String CONNECTION_USER_CONFIG = "connection.user";
+  public static final String CONNECTION_USER_CONFIG = CONNECTION_PREFIX + "user";
   private static final String CONNECTION_USER_DOC = "JDBC connection user.";
   private static final String CONNECTION_USER_DISPLAY = "JDBC User";
 
-  public static final String CONNECTION_PASSWORD_CONFIG = "connection.password";
+  public static final String CONNECTION_PASSWORD_CONFIG = CONNECTION_PREFIX + "password";
   private static final String CONNECTION_PASSWORD_DOC = "JDBC connection password.";
   private static final String CONNECTION_PASSWORD_DISPLAY = "JDBC Password";
 
-  public static final String CONNECTION_ATTEMPTS_CONFIG = "connection.attempts";
+  public static final String CONNECTION_ATTEMPTS_CONFIG = CONNECTION_PREFIX + "attempts";
   private static final String CONNECTION_ATTEMPTS_DOC
-      = "Maximum number of attempts to retrieve a valid JDBC connection.";
+      = "Maximum number of attempts to retrieve a valid JDBC connection. "
+          + "Must be a positive integer.";
   private static final String CONNECTION_ATTEMPTS_DISPLAY = "JDBC connection attempts";
   public static final int CONNECTION_ATTEMPTS_DEFAULT = 3;
 
-  public static final String CONNECTION_BACKOFF_CONFIG = "connection.backoff.ms";
+  public static final String CONNECTION_BACKOFF_CONFIG = CONNECTION_PREFIX + "backoff.ms";
   private static final String CONNECTION_BACKOFF_DOC
       = "Backoff time in milliseconds between connection attempts.";
   private static final String CONNECTION_BACKOFF_DISPLAY
@@ -101,15 +109,16 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + "Precision (deprecated)";
 
   private static final String NUMERIC_MAPPING_DOC =
-      "Map NUMERIC values by precision and optionally scale to integral or decimal types. Use "
-      + "``none`` if all NUMERIC columns are to be represented by Connect's DECIMAL logical "
-      + "type. Use ``best_fit`` if NUMERIC columns should be cast to Connect's INT8, INT16, "
-      + "INT32, INT64, or FLOAT64 based upon the column's precision and scale. Or use "
-      + "``precision_only`` to map NUMERIC columns based only on the column's precision "
-      + "assuming that column's scale is 0. The ``none`` option is the default, but may lead "
-      + "to serialization issues with Avro since Connect's DECIMAL type is mapped to its "
-      + "binary representation, and ``best_fit`` will often be preferred since it maps to the"
-      + " most appropriate primitive type.";
+      "Map NUMERIC values by precision and optionally scale to integral or decimal types.\n"
+      + "  * Use ``none`` if all NUMERIC columns are to be represented by Connect's DECIMAL "
+      + "logical type.\n"
+      + "  * Use ``best_fit`` if NUMERIC columns should be cast to Connect's INT8, INT16, "
+      + "INT32, INT64, or FLOAT64 based upon the column's precision and scale.\n"
+      + "  * Use ``precision_only`` to map NUMERIC columns based only on the column's precision "
+      + "assuming that column's scale is 0.\n"
+      + "  * The ``none`` option is the default, but may lead to serialization issues with Avro "
+      + "since Connect's DECIMAL type is mapped to its binary representation, and ``best_fit`` "
+      + "will often be preferred since it maps to the most appropriate primitive type.";
 
   public static final String NUMERIC_MAPPING_DEFAULT = null;
   private static final String NUMERIC_MAPPING_DISPLAY = "Map Numeric Values, Integral "
@@ -131,14 +140,14 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String MODE_CONFIG = "mode";
   private static final String MODE_DOC =
       "The mode for updating a table each time it is polled. Options include:\n"
-      + "  * bulk - perform a bulk load of the entire table each time it is polled\n"
-      + "  * incrementing - use a strictly incrementing column on each table to "
+      + "  * bulk: perform a bulk load of the entire table each time it is polled\n"
+      + "  * incrementing: use a strictly incrementing column on each table to "
       + "detect only new rows. Note that this will not detect modifications or "
       + "deletions of existing rows.\n"
-      + "  * timestamp - use a timestamp (or timestamp-like) column to detect new and modified "
+      + "  * timestamp: use a timestamp (or timestamp-like) column to detect new and modified "
       + "rows. This assumes the column is updated with each write, and that values are "
       + "monotonically incrementing, but not necessarily unique.\n"
-      + "  * timestamp+incrementing - use two columns, a timestamp column that detects new and "
+      + "  * timestamp+incrementing: use two columns, a timestamp column that detects new and "
       + "modified rows and a strictly incrementing column which provides a globally unique ID for "
       + "updates so each row can be assigned a unique stream offset.";
   private static final String MODE_DISPLAY = "Table Loading Mode";
@@ -166,6 +175,14 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String TIMESTAMP_COLUMN_NAME_DEFAULT = "";
   private static final String TIMESTAMP_COLUMN_NAME_DISPLAY = "Timestamp Column Name";
 
+  public static final String TIMESTAMP_INITIAL_CONFIG = "timestamp.initial";
+  public static final Long TIMESTAMP_INITIAL_DEFAULT = null;
+  public static final Long TIMESTAMP_INITIAL_CURRENT = Long.valueOf(-1);
+  public static final String TIMESTAMP_INITIAL_DOC =
+      "The epoch timestamp used for initial queries that use timestamp criteria. "
+      + "Use -1 to use the current time. If not specified, all data will be retrieved.";
+  public static final String TIMESTAMP_INITIAL_DISPLAY = "Unix time value of initial timestamp";
+
   public static final String TABLE_POLL_INTERVAL_MS_CONFIG = "table.poll.interval.ms";
   private static final String TABLE_POLL_INTERVAL_MS_DOC =
       "Frequency in ms to poll for new or removed tables, which may result in updated task "
@@ -177,31 +194,35 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
 
   public static final String TABLE_WHITELIST_CONFIG = "table.whitelist";
   private static final String TABLE_WHITELIST_DOC =
-      "List of tables to include in copying. If specified, table.blacklist may not be set.";
+      "List of tables to include in copying. If specified, ``table.blacklist`` may not be set. "
+      + "Use a comma-separated list to specify multiple tables "
+      + "(for example, ``table.whitelist: \"User, Address, Email\"``).";
   public static final String TABLE_WHITELIST_DEFAULT = "";
   private static final String TABLE_WHITELIST_DISPLAY = "Table Whitelist";
 
   public static final String TABLE_BLACKLIST_CONFIG = "table.blacklist";
   private static final String TABLE_BLACKLIST_DOC =
-      "List of tables to exclude from copying. If specified, table.whitelist may not be set.";
+      "List of tables to exclude from copying. If specified, ``table.whitelist`` may not be set. "
+      + "Use a comma-separated list to specify multiple tables "
+      + "(for example, ``table.blacklist: \"User, Address, Email\"``).";
   public static final String TABLE_BLACKLIST_DEFAULT = "";
   private static final String TABLE_BLACKLIST_DISPLAY = "Table Blacklist";
 
   public static final String SCHEMA_PATTERN_CONFIG = "schema.pattern";
   private static final String SCHEMA_PATTERN_DOC =
-      "Schema pattern to fetch table metadata from the database:\n"
-      + "  * \"\" retrieves those without a schema,"
-      + "  * null (default) means that the schema name should not be used to narrow the search,"
-      + " so that all table metadata would be fetched, regardless of their schema.";
+      "Schema pattern to fetch table metadata from the database.\n"
+      + "  * ``\"\"`` retrieves those without a schema.\n"
+      + "  * null (default) indicates that the schema name is not used to narrow the search and "
+      + "that all table metadata is fetched, regardless of the schema.";
   private static final String SCHEMA_PATTERN_DISPLAY = "Schema pattern";
   public static final String SCHEMA_PATTERN_DEFAULT = null;
 
   public static final String CATALOG_PATTERN_CONFIG = "catalog.pattern";
   private static final String CATALOG_PATTERN_DOC =
-      "Catalog pattern to fetch table metadata from the database:\n"
-      + "  * \"\" retrieves those without a catalog,"
-      + "  * null (default) means that the catalog name should not be used to narrow the search"
-      + " so that all table metadata would be fetched, regardless of their catalog.";
+      "Catalog pattern to fetch table metadata from the database.\n"
+      + "  * ``\"\"`` retrieves those without a catalog \n"
+      + "  * null (default) indicates that the schema name is not used to narrow the search and "
+        + "that all table metadata is fetched, regardless of the catalog.";
   private static final String CATALOG_PATTERN_DISPLAY = "Schema pattern";
   public static final String CATALOG_PATTERN_DEFAULT = null;
 
@@ -244,7 +265,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String DB_TIMEZONE_CONFIG = "db.timezone";
   public static final String DB_TIMEZONE_DEFAULT = "UTC";
   private static final String DB_TIMEZONE_CONFIG_DOC =
-      "Name of the JDBC timezone that should be used in the connector when "
+      "Name of the JDBC timezone used in the connector when "
       + "querying with time-based criteria. Defaults to UTC.";
   private static final String DB_TIMEZONE_CONFIG_DISPLAY = "DB time zone";
 
@@ -252,8 +273,14 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String QUOTE_SQL_IDENTIFIERS_DEFAULT = QuoteMethod.ALWAYS.name().toString();
   public static final String QUOTE_SQL_IDENTIFIERS_DOC =
       "When to quote table names, column names, and other identifiers in SQL statements. "
-      + "For backward compatibility, the default is 'always'.";
+      + "For backward compatibility, the default is ``always``.";
   public static final String QUOTE_SQL_IDENTIFIERS_DISPLAY = "Quote Identifiers";
+
+  public static final String QUERY_SUFFIX_CONFIG = "query.suffix";
+  public static final String QUERY_SUFFIX_DEFAULT = "";
+  public static final String QUERY_SUFFIX_DOC = 
+      "Suffix to append at the end of the generated query.";
+  public static final String QUERY_SUFFIX_DISPLAY = "Query suffix";
 
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
@@ -278,14 +305,14 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       "By default, the JDBC connector will only detect tables with type TABLE from the source "
       + "Database. This config allows a command separated list of table types to extract. Options"
       + " include:\n"
-      + "* TABLE\n"
-      + "* VIEW\n"
-      + "* SYSTEM TABLE\n"
-      + "* GLOBAL TEMPORARY\n"
-      + "* LOCAL TEMPORARY\n"
-      + "* ALIAS\n"
-      + "* SYNONYM\n"
-      + "In most cases it only makes sense to have either TABLE or VIEW.";
+      + "  * TABLE\n"
+      + "  * VIEW\n"
+      + "  * SYSTEM TABLE\n"
+      + "  * GLOBAL TEMPORARY\n"
+      + "  * LOCAL TEMPORARY\n"
+      + "  * ALIAS\n"
+      + "  * SYNONYM\n"
+      + "  In most cases it only makes sense to have either TABLE or VIEW.";
   private static final String TABLE_TYPE_DISPLAY = "Table Types";
 
   public static ConfigDef baseConfigDef() {
@@ -332,6 +359,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         CONNECTION_ATTEMPTS_CONFIG,
         Type.INT,
         CONNECTION_ATTEMPTS_DEFAULT,
+        ConfigDef.Range.atLeast(1),
         Importance.LOW,
         CONNECTION_ATTEMPTS_DOC,
         DATABASE_GROUP,
@@ -384,7 +412,7 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         SCHEMA_PATTERN_CONFIG,
         Type.STRING,
         SCHEMA_PATTERN_DEFAULT,
-        Importance.MEDIUM,
+        Importance.HIGH,
         SCHEMA_PATTERN_DOC,
         DATABASE_GROUP,
         ++orderInGroup,
@@ -473,6 +501,17 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         TIMESTAMP_COLUMN_NAME_DISPLAY,
         MODE_DEPENDENTS_RECOMMENDER
     ).define(
+        TIMESTAMP_INITIAL_CONFIG,
+        Type.LONG,
+        TIMESTAMP_INITIAL_DEFAULT,
+        Importance.LOW,
+        TIMESTAMP_INITIAL_DOC,
+        MODE_GROUP,
+        ++orderInGroup,
+        Width.MEDIUM,
+        TIMESTAMP_INITIAL_DISPLAY,
+        MODE_DEPENDENTS_RECOMMENDER
+    ).define(
         VALIDATE_NON_NULL_CONFIG,
         Type.BOOLEAN,
         VALIDATE_NON_NULL_DEFAULT,
@@ -503,7 +542,17 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         ++orderInGroup,
         Width.MEDIUM,
         QUOTE_SQL_IDENTIFIERS_DISPLAY,
-        QUOTE_METHOD_RECOMMENDER);
+        QUOTE_METHOD_RECOMMENDER
+    ).define(
+        QUERY_SUFFIX_CONFIG,
+        Type.STRING,
+        QUERY_SUFFIX_DEFAULT,
+        Importance.LOW,
+        QUERY_SUFFIX_DOC,
+        MODE_GROUP,
+        ++orderInGroup,
+        Width.MEDIUM,
+        QUERY_SUFFIX_DISPLAY);
   }
 
   private static final void addConnectorOptions(ConfigDef config) {

@@ -19,6 +19,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +29,14 @@ import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
 
+import io.confluent.connect.jdbc.util.ConfigUtils;
 import io.confluent.connect.jdbc.util.DatabaseDialectRecommender;
 import io.confluent.connect.jdbc.util.DeleteEnabledRecommender;
 import io.confluent.connect.jdbc.util.EnumRecommender;
 import io.confluent.connect.jdbc.util.PrimaryKeyModeRecommender;
 import io.confluent.connect.jdbc.util.QuoteMethod;
 import io.confluent.connect.jdbc.util.StringUtils;
+import io.confluent.connect.jdbc.util.TableType;
 import io.confluent.connect.jdbc.util.TimeZoneValidator;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
@@ -66,7 +69,12 @@ public class JdbcSinkConfig extends AbstractConfig {
   );
 
   public static final String CONNECTION_URL = JdbcSourceConnectorConfig.CONNECTION_URL_CONFIG;
-  private static final String CONNECTION_URL_DOC = "JDBC connection URL.";
+  private static final String CONNECTION_URL_DOC =
+      "JDBC connection URL.\n"
+          + "For example: ``jdbc:oracle:thin:@localhost:1521:orclpdb1``, "
+          + "``jdbc:mysql://localhost/db_name``, "
+          + "``jdbc:sqlserver://localhost;instance=SQLEXPRESS;"
+          + "databaseName=db_name``";
   private static final String CONNECTION_URL_DISPLAY = "JDBC URL";
 
   public static final String CONNECTION_USER = JdbcSourceConnectorConfig.CONNECTION_USER_CONFIG;
@@ -158,6 +166,7 @@ public class JdbcSinkConfig extends AbstractConfig {
       + "    If empty, all fields from the value struct will be used, otherwise used to extract "
       + "the desired fields.";
   private static final String PK_FIELDS_DISPLAY = "Primary Key Fields";
+
   public static final String PK_MODE = "pk.mode";
   private static final String PK_MODE_DEFAULT = "none";
   private static final String PK_MODE_DOC =
@@ -191,7 +200,7 @@ public class JdbcSinkConfig extends AbstractConfig {
   private static final String CONNECTION_GROUP = "Connection";
   private static final String WRITES_GROUP = "Writes";
   private static final String DATAMAPPING_GROUP = "Data Mapping";
-  private static final String DDL_GROUP = "SQL/DDL Support";
+  private static final String DDL_GROUP = "DDL Support";
   private static final String RETRIES_GROUP = "Retries";
 
   private static final String TRANSFORMATION_GROUP = "Transformation Support";
@@ -222,8 +231,22 @@ public class JdbcSinkConfig extends AbstractConfig {
   private static final String QUOTE_SQL_IDENTIFIERS_DISPLAY =
       JdbcSourceConnectorConfig.QUOTE_SQL_IDENTIFIERS_DISPLAY;
 
+  public static final String TABLE_TYPES_CONFIG = "table.types";
+  private static final String TABLE_TYPES_DISPLAY = "Table Types";
+  public static final String TABLE_TYPES_DEFAULT = TableType.TABLE.toString();
+  private static final String TABLE_TYPES_DOC =
+      "The comma-separated types of database tables to which the sink connector can write. "
+      + "By default this is ``" + TableType.TABLE + "``, but any combination of ``"
+      + TableType.TABLE + "`` and ``" + TableType.VIEW + "`` is allowed. Not all databases "
+      + "support writing to views, and when they do the the sink connector will fail if the "
+      + "view definition does not match the records' schemas (regardless of ``"
+      + AUTO_EVOLVE + "``).";
+
   private static final EnumRecommender QUOTE_METHOD_RECOMMENDER =
       EnumRecommender.in(QuoteMethod.values());
+
+  private static final EnumRecommender TABLE_TYPES_RECOMMENDER =
+          EnumRecommender.in(TableType.values());
 
   //FLATTEN:
   //Added flag to indicate flattening
@@ -390,6 +413,18 @@ public class JdbcSinkConfig extends AbstractConfig {
             ConfigDef.Width.SHORT,
             DELETE_ENABLED_DISPLAY,
             DeleteEnabledRecommender.INSTANCE
+        )
+        .define(
+            TABLE_TYPES_CONFIG,
+            ConfigDef.Type.LIST,
+            TABLE_TYPES_DEFAULT,
+            TABLE_TYPES_RECOMMENDER,
+            ConfigDef.Importance.LOW,
+            TABLE_TYPES_DOC,
+            WRITES_GROUP,
+            4,
+            ConfigDef.Width.MEDIUM,
+            TABLE_TYPES_DISPLAY
         )
         // Data Mapping
         .define(
@@ -638,6 +673,7 @@ public class JdbcSinkConfig extends AbstractConfig {
             FLATTEN_INSTRUCTION_CACHE_SIZE_DISPLAY
           );
 
+  public final String connectorName;
   public final String connectionUrl;
   public final String connectionUser;
   public final String connectionPassword;
@@ -654,6 +690,7 @@ public class JdbcSinkConfig extends AbstractConfig {
   public final Set<String> fieldsWhitelist;
   public final String dialectName;
   public final TimeZone timeZone;
+  public final EnumSet<TableType> tableTypes;
   //FLATTEN: flatten boolean
   public final boolean flatten;
   //FLATTEN: coordinates boolean
@@ -677,6 +714,7 @@ public class JdbcSinkConfig extends AbstractConfig {
 
   public JdbcSinkConfig(Map<?, ?> props) {
     super(CONFIG_DEF, props);
+    connectorName = ConfigUtils.connectorName(props);
     connectionUrl = getString(CONNECTION_URL);
     connectionUser = getString(CONNECTION_USER);
     connectionPassword = getPasswordValue(CONNECTION_PASSWORD);
@@ -699,6 +737,7 @@ public class JdbcSinkConfig extends AbstractConfig {
       throw new ConfigException(
           "Primary key mode must be 'record_key' or 'flatten' when delete support is enabled");
     }
+    tableTypes = TableType.parse(getList(TABLE_TYPES_CONFIG));
     //FLATTEN:
     //flatten arrays boolean
     flatten = getBoolean(FLATTEN);
@@ -742,6 +781,18 @@ public class JdbcSinkConfig extends AbstractConfig {
       return password.value();
     }
     return null;
+  }
+
+  public String connectorName() {
+    return connectorName;
+  }
+
+  public EnumSet<TableType> tableTypes() {
+    return tableTypes;
+  }
+
+  public Set<String> tableTypeNames() {
+    return tableTypes().stream().map(TableType::toString).collect(Collectors.toSet());
   }
 
   private static class EnumValidator implements ConfigDef.Validator {
@@ -791,4 +842,5 @@ public class JdbcSinkConfig extends AbstractConfig {
   public static void main(String... args) {
     System.out.println(CONFIG_DEF.toEnrichedRst());
   }
+
 }
