@@ -117,7 +117,7 @@ public class BufferedRecords {
       valueSchema = record.valueSchema();
       schemaChanged = true;
     }
-    if (schemaChanged || updateStatementBinder == null) {
+    if (schemaChanged /*|| updateStatementBinder == null*/) {
       // Each batch needs to have the same schemas, so get the buffered records out
       flushed.addAll(flush());
 
@@ -196,12 +196,6 @@ public class BufferedRecords {
         );
       }
     }
-    
-    // set deletesInBatch if schema value is not null
-    if (isNull(record.value()) && config.deleteEnabled) {
-      deletesInBatch = true;
-    }
-
     records.add(record);
 
     if (records.size() >= config.batchSize) {
@@ -248,7 +242,6 @@ public class BufferedRecords {
 
     final List<SinkRecord> flushedRecords = records;
     records = new ArrayList<>();
-    keyCoordinates.clear();
     deletesInBatch = false;
     updatesInBatch = false;
     return flushedRecords;
@@ -311,6 +304,7 @@ public class BufferedRecords {
       deletePreparedStatement.close();
       deletePreparedStatement = null;
     }
+    keyCoordinates.clear();
   }
 
   private String getInsertSql() {

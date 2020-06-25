@@ -189,13 +189,12 @@ public class FieldsMetadata {
 
   //FLATTEN:
   public static FieldsMetadata extract(
-      final String tableName,
-      final JdbcSinkConfig.PrimaryKeyMode pkMode,
-      final SchemaPair schemaPair,
-      final Headers headers,
-      boolean deleteEnabled,
-      JdbcSinkConfig.InsertMode insertMode
-  ) {
+          final String tableName,
+          final JdbcSinkConfig.PrimaryKeyMode pkMode,
+          final SchemaPair schemaPair,
+          final Headers headers,
+          boolean deleteEnabled,
+          JdbcSinkConfig.InsertMode insertMode) {
     if (schemaPair.valueSchema != null && schemaPair.valueSchema.type() != Schema.Type.STRUCT) {
       throw new ConnectException("Value schema must be of type Struct");
     }

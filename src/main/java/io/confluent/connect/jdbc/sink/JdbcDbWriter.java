@@ -27,6 +27,8 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -63,7 +65,7 @@ public class JdbcDbWriter {
 
   void write(final Collection<SinkRecord> records) throws SQLException {
     final Connection connection = cachedConnectionProvider.getConnection();
-    final Map<TableId, BufferedRecords> bufferByTable = new HashMap<>();
+    final ConcurrentMap<TableId, BufferedRecords> bufferByTable = new ConcurrentHashMap<>();
     for (SinkRecord record : records) {
       //FLATTEN:
       //If the flatten config property is true
