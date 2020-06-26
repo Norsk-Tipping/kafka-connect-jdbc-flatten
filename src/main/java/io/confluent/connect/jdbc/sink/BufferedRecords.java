@@ -86,6 +86,7 @@ public class BufferedRecords {
       keySchema = record.keySchema();
       schemaChanged = true;
     }
+    //Tombstone record
     if (isNull(record.valueSchema())) {
       // For deletes, value and optionally value schema come in as null.
       // We don't want to treat this as a schema change if key schemas is the same
@@ -93,26 +94,44 @@ public class BufferedRecords {
       if (config.deleteEnabled) {
         deletesInBatch = true;
       }
-    } else if (Objects.equals(valueSchema, record.valueSchema())) {
-      if (config.flatten && config.insertMode == UPSERT) {
+    }
+    //Same value schema as for previous record
+    else if (Objects.equals(valueSchema, record.valueSchema())) {
+      //When upsert is configured, deletes are executed before inserts.
+      //When subsequent messages within the same batch arrive for the same key, this requires an in-between flush
+      //the flush will assure that in the endstate after commit, the table will contain the state of the last record value for relevant key
+      if (config.insertMode == UPSERT && config.flatten) {
         KeyCoordinate keyCoordinate = new KeyCoordinate(record.valueSchema().name(), record.kafkaPartition(), record.kafkaOffset());
-        if (keyCoordinates.get(record.key()) != null) {
+        if (record.value() != null && keyCoordinates.get(record.key()) != null) {
           if (!keyCoordinates.get(record.key()).equals(keyCoordinate)) {
             flushed.addAll(flush());
           }
         }
         keyCoordinates.put(record.key(), keyCoordinate);
       }
+      //Tombstone record
       if (config.deleteEnabled && deletesInBatch) {
         // flush so an insert after a delete of same record isn't lost
         updatesInBatch = true;
         flushed.addAll(flush());
       }
+      // no tombstone message i.e. an insert or upsert value
       else {
-        updatesInBatch = true;
+        if (record.value() != null) { updatesInBatch = true; }
+        //Upsert value that should delete current content for this record key in target table
+        else if (config.flatten && config.insertMode == UPSERT) {
+          deletesInBatch = true;
+        }
       }
-    } else {
-      updatesInBatch = true;
+    }
+    //Different value schema as for previous record
+    else {
+      //Update or insert
+      if (record.value() != null) { updatesInBatch = true; }
+      //Upsert value that should delete current content for this record key in target table
+      else if (config.flatten && config.insertMode == UPSERT) {
+        deletesInBatch = true;
+      }
       // value schema is not null and has changed. This is a real schema change.
       valueSchema = record.valueSchema();
       schemaChanged = true;
@@ -209,7 +228,7 @@ public class BufferedRecords {
       log.debug("Records is empty");
       return new ArrayList<>();
     }
-    log.debug("Flushing {} buffered records", records.size());
+    log.debug("Flushing {} buffered records for table {}", records.size(), tableId.tableName());
     for (SinkRecord record : records) {
       if (isNull(record.value()) && nonNull(deleteStatementBinder)) {
         deleteStatementBinder.bindRecord(record);
@@ -234,14 +253,16 @@ public class BufferedRecords {
     }
     if (!totalUpdateCount.isPresent()) {
       log.info(
-          "{} records:{} , but no count of the number of rows it affected is available",
+          "{} records:{} for table {}, but no count of the number of rows it affected is available",
           config.insertMode,
-          records.size()
+          records.size(),
+          tableId.tableName()
       );
     }
 
     final List<SinkRecord> flushedRecords = records;
     records = new ArrayList<>();
+    keyCoordinates.clear();
     deletesInBatch = false;
     updatesInBatch = false;
     return flushedRecords;
@@ -252,10 +273,12 @@ public class BufferedRecords {
    */
   private Optional<Long> executeUpdates() throws SQLException {
     Optional<Long> count = Optional.empty();
-      if (config.flatten && config.insertMode == UPSERT){
-        deletesInBatch = true;
-        executeDeletes();
-        deletesInBatch = false;
+    try {
+      if (config.flatten && config.insertMode == UPSERT) {
+        if (deletesInBatch) {
+          executeDeletes();
+          deletesInBatch = false;
+        }
       }
       if (updatesInBatch) {
         for (int updateCount : updatePreparedStatement.executeBatch()) {
@@ -266,7 +289,11 @@ public class BufferedRecords {
           }
         }
       }
-
+    } catch (SQLException sqlException) {
+      log.error("SQLException for table {}, deletesInBatch {}, updatesInBatch {}, deletePreparedStatement {}, updatePreparedStatement {}",
+              tableId.tableName(), deletesInBatch, updatesInBatch, deletePreparedStatement, updatePreparedStatement);
+      throw sqlException;
+    }
     return count;
   }
 
@@ -304,7 +331,6 @@ public class BufferedRecords {
       deletePreparedStatement.close();
       deletePreparedStatement = null;
     }
-    keyCoordinates.clear();
   }
 
   private String getInsertSql() {
