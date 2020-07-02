@@ -15,7 +15,6 @@
 
 package io.confluent.connect.jdbc.sink;
 
-import io.confluent.connect.jdbc.sink.StreamFlatten.KeyCoordinate;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -60,8 +59,9 @@ public class BufferedRecords {
   private StatementBinder updateStatementBinder;
   private StatementBinder deleteStatementBinder;
   private boolean deletesInBatch = false;
+  private boolean upsertDeletesInBatch = false;
   private boolean updatesInBatch = false;
-  private final HashMap<Object, KeyCoordinate> keyCoordinates = new HashMap<>();
+  private final HashSet<Object> keys;
 
   public BufferedRecords(
       JdbcSinkConfig config,
@@ -76,11 +76,13 @@ public class BufferedRecords {
     this.dbStructure = dbStructure;
     this.connection = connection;
     this.recordValidator = RecordValidator.create(config);
+    this.keys = new HashSet<>();
   }
 
   public List<SinkRecord> add(SinkRecord record) throws SQLException {
     recordValidator.validate(record);
     final List<SinkRecord> flushed = new ArrayList<>();
+
     boolean schemaChanged = false;
     if (!Objects.equals(keySchema, record.keySchema())) {
       keySchema = record.keySchema();
@@ -97,41 +99,15 @@ public class BufferedRecords {
     }
     //Same value schema as for previous record
     else if (Objects.equals(valueSchema, record.valueSchema())) {
-      //When upsert is configured, deletes are executed before inserts.
-      //When subsequent messages within the same batch arrive for the same key, this requires an in-between flush
-      //the flush will assure that in the endstate after commit, the table will contain the state of the last record value for relevant key
-      if (config.insertMode == UPSERT && config.flatten) {
-        KeyCoordinate keyCoordinate = new KeyCoordinate(record.valueSchema().name(), record.kafkaPartition(), record.kafkaOffset());
-        if (record.value() != null && keyCoordinates.get(record.key()) != null) {
-          if (!keyCoordinates.get(record.key()).equals(keyCoordinate)) {
-            flushed.addAll(flush());
-          }
-        }
-        keyCoordinates.put(record.key(), keyCoordinate);
-      }
       //Tombstone record
-      if (config.deleteEnabled && deletesInBatch) {
+      if ((deletesInBatch && config.deleteEnabled) ||
+              (record.value() == null && config.flatten && config.insertMode == UPSERT && keys.contains(record.key()))) {
         // flush so an insert after a delete of same record isn't lost
-        updatesInBatch = true;
         flushed.addAll(flush());
-      }
-      // no tombstone message i.e. an insert or upsert value
-      else {
-        if (record.value() != null) { updatesInBatch = true; }
-        //Upsert value that should delete current content for this record key in target table
-        else if (config.flatten && config.insertMode == UPSERT) {
-          deletesInBatch = true;
-        }
       }
     }
     //Different value schema as for previous record
     else {
-      //Update or insert
-      if (record.value() != null) { updatesInBatch = true; }
-      //Upsert value that should delete current content for this record key in target table
-      else if (config.flatten && config.insertMode == UPSERT) {
-        deletesInBatch = true;
-      }
       // value schema is not null and has changed. This is a real schema change.
       valueSchema = record.valueSchema();
       schemaChanged = true;
@@ -139,7 +115,6 @@ public class BufferedRecords {
     if (schemaChanged /*|| updateStatementBinder == null*/) {
       // Each batch needs to have the same schemas, so get the buffered records out
       flushed.addAll(flush());
-
       // re-initialize everything that depends on the record schema
       final SchemaPair schemaPair = new SchemaPair(
           record.keySchema(),
@@ -216,6 +191,13 @@ public class BufferedRecords {
       }
     }
     records.add(record);
+    if (record.value() != null) { updatesInBatch = true; }
+    else {
+      if (record.valueSchema() != null && config.flatten && config.insertMode == UPSERT) {
+        upsertDeletesInBatch = true;
+        keys.add(record.key());
+      }
+    }
 
     if (records.size() >= config.batchSize) {
       flushed.addAll(flush());
@@ -223,7 +205,7 @@ public class BufferedRecords {
     return flushed;
   }
 
-  public List<SinkRecord> flush() throws SQLException {
+  public synchronized List<SinkRecord> flush() throws SQLException {
     if (records.isEmpty()) {
       log.debug("Records is empty");
       return new ArrayList<>();
@@ -262,9 +244,10 @@ public class BufferedRecords {
 
     final List<SinkRecord> flushedRecords = records;
     records = new ArrayList<>();
-    keyCoordinates.clear();
     deletesInBatch = false;
     updatesInBatch = false;
+    upsertDeletesInBatch = false;
+    keys.clear();
     return flushedRecords;
   }
 
@@ -275,7 +258,8 @@ public class BufferedRecords {
     Optional<Long> count = Optional.empty();
     try {
       if (config.flatten && config.insertMode == UPSERT) {
-        if (deletesInBatch) {
+        if (upsertDeletesInBatch || deletesInBatch) {
+          deletesInBatch = true;
           executeDeletes();
           deletesInBatch = false;
         }

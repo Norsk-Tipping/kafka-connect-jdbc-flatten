@@ -16,12 +16,7 @@
 package io.confluent.connect.jdbc.sink;
 
 import io.confluent.connect.jdbc.sink.StreamFlatten.FlattenTransformation;
-import io.confluent.connect.jdbc.sink.StreamFlatten.KeyCoordinate;
-import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.errors.ConnectException;
-import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.sql.Connection;
@@ -31,7 +26,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.util.CachedConnectionProvider;
@@ -114,17 +108,12 @@ public class JdbcDbWriter {
               }
               //Manage the BufferedRecords of the flattened record by its fullname as opposed to the renamed name.
               //This allows to identify table rename changes and the ability to map delete requests i.e. null values to the correct buffer
-              BufferedRecords buffer = bufferByTable.get(substructTableId);
               //if no buffer exists yet for given target table a new BufferedRecords object
               //gets created
-              if (buffer == null) {
-                //Assign the renamedTableId to the BufferedRecords as this will eventually become the table name as opposed to the fullname
-                buffer = new BufferedRecords(config, renamedTableId, dbDialect,
-                        dbStructure, connection);
-                //Manage the BufferedRecords of the flattened record by its fullname as opposed to the renamed name
-                //This allows to identify table rename changes and the ability to map delete requests i.e. null values to the correct buffer
-                bufferByTable.put(substructTableId, buffer);
-              }
+              //Manage the BufferedRecords of the flattened record by its fullname as opposed to the renamed name
+              //This allows to identify table rename changes and the ability to map delete requests i.e. null values to the correct buffer
+              BufferedRecords buffer = bufferByTable.computeIfAbsent(substructTableId, k -> new BufferedRecords(config, renamedTableId, dbDialect,
+                      dbStructure, connection));
               //add the flattened record to the buffer
               try {
                 buffer.add(fr);
@@ -169,17 +158,19 @@ public class JdbcDbWriter {
                             + " but this table schema has not yet been cached neither could it be found in Database Metadata");}
                       //If tableIdList is not empty, there exists a buffer and/or matching tables exist in the target db
                       tableIdList.forEach(ctid -> {
-                        //For each mathing tableId found
-                        //Create a buffer for each mathing table
-                      BufferedRecords buffer = new BufferedRecords(config, destinationTable(ctid.getValue1().tableName()), dbDialect, dbStructure, connection);
-                        try {
-                          //Add the null value to each buffer to assure delete from all flattened tables
-                          buffer.add(fr);
-                        } catch (SQLException e) {
-                          e.printStackTrace();
-                          throw new RuntimeException(e);
-                        }
-                        bufferByTable.put(destinationTable(ctid.getValue0()), buffer);
+                        //For each matching tableId found
+                        bufferByTable.computeIfAbsent(destinationTable(ctid.getValue0()), k -> {
+                          //Create a buffer for each matching table
+                          BufferedRecords buffer = new BufferedRecords(config, destinationTable(ctid.getValue1().tableName()), dbDialect, dbStructure, connection);
+                          try {
+                            //Add the null value to each buffer to assure delete from all flattened tables
+                            buffer.add(fr);
+                          } catch (SQLException e) {
+                            e.printStackTrace();
+                            throw new RuntimeException(e);
+                          }
+                          return buffer;
+                        });
                     });
                   }
                   //A null value was received for a but there are already matching buffers in place

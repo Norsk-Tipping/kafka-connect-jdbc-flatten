@@ -1473,18 +1473,13 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     String tableName2 = topic + "_" + "person_address";
     tablesUsed.add(tableName1);
     tablesUsed.add(tableName2);
-    task.put(Collections.singleton(
-            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, SCHEMA, struct, 42)
+    task.put(Arrays.asList(
+            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, SCHEMA, struct, 42),
+            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct2, SCHEMA, struct, 43),
+              new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, SCHEMA, structUpsert, 44),
+              new SinkRecord(topic, 1, KEYSCHEMA, keyStruct2, SCHEMA, structUpsertWithArrayUpsert, 45)
     ));
-    task.put(Collections.singleton(
-            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct2, SCHEMA, struct, 43)
-    ));
-    task.put(Collections.singleton(
-            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct1, SCHEMA, structUpsert, 44)
-    ));
-    task.put(Collections.singleton(
-            new SinkRecord(topic, 1, KEYSCHEMA, keyStruct2, SCHEMA, structUpsertWithArrayUpsert, 45)
-    ));
+
 
     assertEquals(
             1,
