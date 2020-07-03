@@ -88,7 +88,7 @@ public class FlattenTransformation {
 
     //Each set of instruction in the list represents a target table. Extraction of the substructures and insertion in
     //respective target tables can happen in parralel to improve throughput.
-    return processInstructions.parallelStream()
+    return processInstructions.stream()
             .flatMap(pi -> {
               //Headers contain key values that convey primary key locations (full pathname of the primary key fields)
               // and their target field names for the 'flattened' sinkrecords

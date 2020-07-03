@@ -205,7 +205,7 @@ public class BufferedRecords {
     return flushed;
   }
 
-  public synchronized List<SinkRecord> flush() throws SQLException {
+  public List<SinkRecord> flush() throws SQLException {
     if (records.isEmpty()) {
       log.debug("Records is empty");
       return new ArrayList<>();
