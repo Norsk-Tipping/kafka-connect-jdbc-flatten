@@ -94,6 +94,10 @@ public class BufferedRecords {
       // We don't want to treat this as a schema change if key schemas is the same
       // otherwise we flush unnecessarily.
       if (config.deleteEnabled) {
+        if (config.flatten && config.insertMode == UPSERT && keys.contains(record.key())) {
+          // flush so a tombstone after a delete of same record isn't lost
+          flushed.addAll(flush());
+        }
         deletesInBatch = true;
       }
     }
