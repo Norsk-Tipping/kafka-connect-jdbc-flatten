@@ -38,12 +38,13 @@
     <packaging>jar</packaging>
     <name>kafka-connect-jdbc_flatten</name>
     <organization>
-        <name>Confluent, Inc.</name>
-        <url>http://confluent.io</url>
+        <name>Norsk Tipping AS</name>
+        <url>https://www.norsk-tipping.no/selskapet/engelsk</url>
     </organization>
-    <url>http://confluent.io</url>
+    <url>https://www.norsk-tipping.no/selskapet/engelsk</url>
     <description>
-       A Kafka Connect JDBC connector for copying data between databases and Kafka.
+       A Kafka Connect JDBC connector for copying data between databases and Kafka with a flattening feature to
+        dereference arrays and maps into seperate target tables.
     </description>
 
     <licenses>
@@ -53,13 +54,6 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
-
-    <scm>
-        <connection>scm:git:git://github.com/confluentinc/kafka-connect-jdbc.git</connection>
-        <developerConnection>scm:git:git@github.com:confluentinc/kafka-connect-jdbc.git</developerConnection>
-        <url>https://github.com/confluentinc/kafka-connect-jdbc</url>
-        <tag>HEAD</tag>
-    </scm>
 
     <properties>
         <confluent.version>${project.version}</confluent.version>
@@ -247,9 +241,11 @@
                             <goal>kafka-connect</goal>
                         </goals>
                         <configuration>
-                            <title>Kafka Connect JDBC</title>
-                            <documentationUrl>https://docs.confluent.io/${project.version}/connect/connect-jdbc/docs/index.html</documentationUrl>
+                            <title>Kafka Connect JDBC with Flatten Feature</title>
+                            <documentationUrl>https://github.com/gertschouten/kafka-connect-jdbc-flatten/</documentationUrl>
                             <description>
+                                This connector is an extension to the existing Confluent JDBC connector.
+
                                 The JDBC source and sink connectors allow you to exchange data between relational databases and Kafka.
 
                                 The JDBC source connector allows you to import data from any relational database with a JDBC driver into Kafka topics. By using JDBC, this connector can support a wide variety of databases without requiring custom code for each one.
@@ -257,23 +253,16 @@
                                 Data is loaded by periodically executing a SQL query and creating an output record for each row in the result set. By default, all tables in a database are copied, each to its own output topic. The database is monitored for new or deleted tables and adapts automatically. When copying data from a table, the connector can load only new or modified rows by specifying which columns should be used to detect new or modified data.
 
                                 The JDBC sink connector allows you to export data from Kafka topics to any relational database with a JDBC driver. By using JDBC, this connector can support a wide variety of databases without requiring a dedicated connector for each one. The connector polls data from Kafka to write to the database based on the topics subscription. It is possible to achieve idempotent writes with upserts. Auto-creation of tables, and limited auto-evolution is also supported.
+
+                                With the flattening feature enabled, maps and arrays will be dereferenced and written to seperate target tables.
                             </description>
-                            <logo>logos/jdbc.jpg</logo>
+                            <logo>logos/jdbc_flatten.png</logo>
 
-                            <supportProviderName>Confluent, Inc.</supportProviderName>
-                            <supportSummary>Confluent supports the JDBC sink and source connectors alongside community members as part of its Confluent Platform offering.</supportSummary>
-                            <supportUrl>https://docs.confluent.io/current/</supportUrl>
-                            <supportLogo>logos/confluent.png</supportLogo>
-
-                            <ownerUsername>confluentinc</ownerUsername>
+                            <ownerUsername>gertschouten</ownerUsername>
                             <ownerType>organization</ownerType>
-                            <ownerName>Confluent, Inc.</ownerName>
-                            <ownerUrl>https://confluent.io/</ownerUrl>
-                            <ownerLogo>logos/confluent.png</ownerLogo>
-
-                            <dockerNamespace>confluentinc</dockerNamespace>
-                            <dockerName>cp-kafka-connect</dockerName>
-                            <dockerTag>${project.version}</dockerTag>
+                            <ownerName>Norsk Tipping AS</ownerName>
+                            <ownerUrl>https://www.norsk-tipping.no/selskapet/engelsk</ownerUrl>
+                            <ownerLogo>logos/nt.png</ownerLogo>
 
                             <componentTypes>
                                 <componentType>sink</componentType>
