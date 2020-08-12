@@ -15,7 +15,7 @@
 
 package io.confluent.connect.jdbc.sink;
 
-import io.confluent.connect.jdbc.sink.StreamFlatten.FlattenTransformation;
+import no.norsktipping.kafka.connect.jdbc.sink.StreamFlatten.StreamFlatten.FlattenTransformation;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
 

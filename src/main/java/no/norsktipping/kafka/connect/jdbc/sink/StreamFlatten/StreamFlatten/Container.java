@@ -1,4 +1,4 @@
-package io.confluent.connect.jdbc.sink.StreamFlatten;
+package no.norsktipping.kafka.connect.jdbc.sink.StreamFlatten.StreamFlatten;
 
 import org.apache.kafka.connect.data.Schema;
 

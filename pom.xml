@@ -33,7 +33,6 @@
     </pluginRepositories>
 
 
-    <groupId>io.confluent</groupId>
     <artifactId>kafka-connect-jdbc_flatten</artifactId>
     <packaging>jar</packaging>
     <name>kafka-connect-jdbc_flatten</name>
@@ -246,6 +245,8 @@
                             <description>
                                 This connector is an extension to the existing Confluent JDBC connector.
 
+                                With the flattening feature enabled, maps and arrays will be dereferenced and written to seperate target tables.
+
                                 The JDBC source and sink connectors allow you to exchange data between relational databases and Kafka.
 
                                 The JDBC source connector allows you to import data from any relational database with a JDBC driver into Kafka topics. By using JDBC, this connector can support a wide variety of databases without requiring custom code for each one.
@@ -253,12 +254,10 @@
                                 Data is loaded by periodically executing a SQL query and creating an output record for each row in the result set. By default, all tables in a database are copied, each to its own output topic. The database is monitored for new or deleted tables and adapts automatically. When copying data from a table, the connector can load only new or modified rows by specifying which columns should be used to detect new or modified data.
 
                                 The JDBC sink connector allows you to export data from Kafka topics to any relational database with a JDBC driver. By using JDBC, this connector can support a wide variety of databases without requiring a dedicated connector for each one. The connector polls data from Kafka to write to the database based on the topics subscription. It is possible to achieve idempotent writes with upserts. Auto-creation of tables, and limited auto-evolution is also supported.
-
-                                With the flattening feature enabled, maps and arrays will be dereferenced and written to seperate target tables.
                             </description>
                             <logo>logos/jdbc_flatten.png</logo>
 
-                            <ownerUsername>gertschouten</ownerUsername>
+                            <ownerUsername>norsktipping</ownerUsername>
                             <ownerType>organization</ownerType>
                             <ownerName>Norsk Tipping AS</ownerName>
                             <ownerUrl>https://www.norsk-tipping.no/selskapet/engelsk</ownerUrl>
@@ -285,6 +284,7 @@
                                 <tag>sap hana</tag>
                                 <tag>derby</tag>
                                 <tag>sqlite</tag>
+                                <tag>flatten</tag>
                             </tags>
 
                             <confluentControlCenterIntegration>true</confluentControlCenterIntegration>
@@ -321,19 +321,18 @@
                 </executions>
             </plugin>
             <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <configuration>
-                    <descriptors>
-                        <descriptor>src/assembly/development.xml</descriptor>
-                        <descriptor>src/assembly/package.xml</descriptor>
-                    </descriptors>
-                </configuration>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
+                        <id>validate</id>
+                        <!--<phase>validate</phase>-->
+                        <phase>none</phase>
+                        <configuration>
+                            <suppressionsLocation>checkstyle/suppressions.xml</suppressionsLocation>
+                        </configuration>
                         <goals>
-                            <goal>single</goal>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -354,31 +353,56 @@
                                     <mainClass>io.confluent.connect.jdbc.JdbcSinkConnector_Flatten</mainClass>
                                 </transformer>
                             </transformers>
+                            <finalName>norsktipping-${project.artifactId}-${project.version}</finalName>
+                            <outputDirectory>target</outputDirectory>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
+                <artifactId>maven-jar-plugin</artifactId>
                 <executions>
                     <execution>
-                        <id>validate</id>
-                        <!--<phase>validate</phase>-->
+                        <id>test-jar</id>
                         <phase>none</phase>
                         <configuration>
-                            <suppressionsLocation>checkstyle/suppressions.xml</suppressionsLocation>
+                            <finalName>unwanted</finalName>
+                            <classifier>unwanted</classifier>
                         </configuration>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
+                    </execution>
+                    <execution>
+                        <id>default-jar</id>
+                        <phase>none</phase>
+                        <configuration>
+                            <finalName>unwanted</finalName>
+                            <classifier>unwanted</classifier>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>default</id>
+                        <phase>none</phase>
+                        <configuration>
+                            <finalName>unwanted</finalName>
+                            <classifier>unwanted</classifier>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>rpm-maven-plugin</artifactId>
-                <version>2.1.5</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>${maven-install-plugin.version}</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <id>custom-install</id>
+                        <goals>
+                            <goal>install-file</goal>
+                        </goals>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -393,196 +417,4 @@
             </resource>
         </resources>
     </build>
-
-    <profiles>
-        <profile>
-            <id>rpm</id>
-            <build>
-            <plugins>
-                <plugin>
-                    <groupId>org.codehaus.mojo</groupId>
-                    <artifactId>rpm-maven-plugin</artifactId>
-                    <version>2.1.5</version>
-                    <executions>
-                        <execution>
-                            <id>generate-rpm</id>
-                            <goals>
-                                <goal>rpm</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                        <configuration>
-                            <group>Applications/Internet</group>
-                            <packager>Confluent Packaging</packager>
-                            <license>${licenses.name}</license>
-                            <needarch>noarch</needarch>
-                            <targetOS>linux</targetOS>
-                            <requires>
-                                <require>confluent-common = ${project.version}</require>
-                            </requires>
-                            <mappings>
-                                <mapping>
-                                    <directory>/usr/share/java/${project.artifactId}</directory>
-                                    <sources>
-                                        <source>
-                                            <location>${project.package.home}/share/java/${project.artifactId}</location>
-                                        </source>
-                                    </sources>
-                                </mapping>
-                                <mapping>
-                                    <configuration>true</configuration>
-                                    <directory>/etc/${project.artifactId}</directory>
-                                    <sources>
-                                        <source>
-                                            <location>${project.package.home}/etc/${project.artifactId}</location>
-                                        </source>
-                                    </sources>
-                                </mapping>
-                                <mapping>
-                                    <documentation>true</documentation>
-                                    <directory>/usr/share/doc/${project.artifactId}</directory>
-                                    <sources>
-                                        <source>
-                                            <location>${project.package.home}/share/doc/${project.artifactId}</location>
-                                        </source>
-                                    </sources>
-                                </mapping>
-                            </mappings>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>standalone</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <artifactId>maven-assembly-plugin</artifactId>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/assembly/standalone.xml</descriptor>
-                            </descriptors>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>licenses-package</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>1.2.1</version>
-                        <executions>
-                            <execution>
-                                <id>create-licenses</id>
-                                <configuration>
-                                    <mainClass>io.confluent.licenses.LicenseFinder</mainClass>
-                                    <arguments>
-                                        <!--Note use of development instead of package so we pick up all dependencies.-->
-                                        <argument>-i ${project.build.directory}/${project.build.finalName}-package/share/java/kafka-connect-jdbc_flatten</argument>
-                                        <argument>-o ${project.basedir}/licenses</argument>
-                                        <argument>-f</argument>
-                                        <argument>-h ${project.build.directory}/${project.build.finalName}-package/share/doc/kafka-connect-jdbc_flatten/licenses.html</argument>
-                                        <argument>-l ${project.build.directory}/${project.build.finalName}-package/share/doc/kafka-connect-jdbc_flatten/licenses</argument>
-                                        <argument>-n ${project.build.directory}/${project.build.finalName}-package/share/doc/kafka-connect-jdbc_flatten/notices</argument>
-                                        <argument>-t ${project.name}</argument>
-                                        <argument>-x licenses-${licenses.version}.jar</argument>
-                                    </arguments>
-                                </configuration>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>java</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <includeProjectDependencies>true</includeProjectDependencies>
-                            <includePluginDependencies>true</includePluginDependencies>
-                            <executableDependency>
-                                <groupId>io.confluent</groupId>
-                                <artifactId>licenses</artifactId>
-                            </executableDependency>
-                        </configuration>
-                        <dependencies>
-                            <dependency>
-                                <groupId>io.confluent</groupId>
-                                <artifactId>licenses</artifactId>
-                                <version>${licenses.version}</version>
-                            </dependency>
-                        </dependencies>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-	<profile>
-        <id>licenses-source</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>1.2.1</version>
-                        <executions>
-                            <execution>
-                                <id>create-licenses</id>
-                                <configuration>
-                                    <mainClass>io.confluent.licenses.LicenseFinder</mainClass>
-                                    <arguments>
-                                        <!--Note use of development instead of package so we pick up all dependencies.-->
-                                        <argument>-i ${project.build.directory}/${project.build.finalName}-development/share/java/kafka-connect-jdbc_flatten</argument>
-                                        <argument>-o ${project.basedir}/licenses</argument>
-                                        <argument>-f</argument>
-                                        <argument>-h ${project.basedir}/licenses.html</argument>
-                                        <argument>-l ${project.basedir}/licenses</argument>
-                                        <argument>-n ${project.basedir}/notices</argument>
-                                        <argument>-t ${project.name}</argument>
-                                        <argument>-x licenses-${licenses.version}.jar</argument>
-                                    </arguments>
-                                </configuration>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>java</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <includeProjectDependencies>true</includeProjectDependencies>
-                            <includePluginDependencies>true</includePluginDependencies>
-                            <executableDependency>
-                                <groupId>io.confluent</groupId>
-                                <artifactId>licenses</artifactId>
-                            </executableDependency>
-                        </configuration>
-                        <dependencies>
-                            <dependency>
-                                <groupId>io.confluent</groupId>
-                                <artifactId>licenses</artifactId>
-                                <version>${licenses.version}</version>
-                            </dependency>
-                        </dependencies>
-                    </plugin>
-                    <plugin>
-                        <artifactId>maven-clean-plugin</artifactId>
-                        <version>3.0.0</version>
-                        <configuration>
-                            <filesets>
-                                <fileset>
-                                    <directory>.</directory>
-                                    <includes>
-                                        <include>licenses.html</include>
-                                        <directory>licenses/*.*</directory>
-                                        <directory>notices/*.*</directory>
-                                    </includes>
-                                </fileset>
-                            </filesets>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>

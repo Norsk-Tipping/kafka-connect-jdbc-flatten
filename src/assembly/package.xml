@@ -24,7 +24,7 @@
         </fileSet>
         <fileSet>
             <directory>${project.basedir}/config</directory>
-            <outputDirectory>etc/kafka-connect-jdbc</outputDirectory>
+            <outputDirectory>etc/kafka-connect-jdbc_flatten</outputDirectory>
             <includes>
                 <include>*</include>
             </includes>
@@ -32,7 +32,7 @@
     </fileSets>
     <dependencySets>
         <dependencySet>
-            <outputDirectory>share/java/kafka-connect-jdbc</outputDirectory>
+            <outputDirectory>share/java/kafka-connect-jdbc_flatten</outputDirectory>
             <useProjectArtifact>true</useProjectArtifact>
             <useTransitiveFiltering>true</useTransitiveFiltering>
             <excludes>

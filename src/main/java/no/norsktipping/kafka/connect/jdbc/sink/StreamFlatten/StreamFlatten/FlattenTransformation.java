@@ -1,4 +1,4 @@
-package io.confluent.connect.jdbc.sink.StreamFlatten;
+package no.norsktipping.kafka.connect.jdbc.sink.StreamFlatten.StreamFlatten;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;

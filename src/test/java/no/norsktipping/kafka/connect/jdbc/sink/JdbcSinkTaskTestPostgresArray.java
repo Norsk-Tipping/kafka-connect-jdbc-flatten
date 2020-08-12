@@ -13,8 +13,9 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package io.confluent.connect.jdbc.sink;
+package no.norsktipping.kafka.connect.jdbc.sink;
 
+import io.confluent.connect.jdbc.sink.JdbcSinkTask;
 import io.confluent.connect.jdbc.util.DateTimeUtils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -32,7 +33,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-import static io.confluent.connect.jdbc.sink.PostgresHelper.tablesUsed;
+import static no.norsktipping.kafka.connect.jdbc.sink.PostgresHelper.tablesUsed;
 import static org.junit.Assert.*;
 
 public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {

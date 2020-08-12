@@ -1,4 +1,4 @@
-package io.confluent.connect.jdbc.sink;
+package no.norsktipping.kafka.connect.jdbc.sink;
 
 import java.io.IOException;
 import java.nio.file.Files;
