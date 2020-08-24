@@ -69,6 +69,10 @@
         <confluent.maven.repo>http://packages.confluent.io/maven/</confluent.maven.repo>
     </properties>
 
+    <scm>
+        <url>https://github.com/gertschouten/kafka-connect-jdbc-flatten</url>
+    </scm>
+
     <repositories>
         <repository>
             <id>confluent</id>
