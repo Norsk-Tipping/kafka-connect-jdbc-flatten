@@ -70,7 +70,7 @@
     </properties>
 
     <scm>
-        <url>https://github.com/gertschouten/kafka-connect-jdbc-flatten</url>
+        <url>https://github.com/Norsk-Tipping/kafka-connect-jdbc-flatten</url>
     </scm>
 
     <repositories>
@@ -245,7 +245,7 @@
                         </goals>
                         <configuration>
                             <title>Kafka Connect JDBC with Flatten Feature</title>
-                            <documentationUrl>https://github.com/gertschouten/kafka-connect-jdbc-flatten/</documentationUrl>
+                            <documentationUrl>https://github.com/Norsk-Tipping/kafka-connect-jdbc-flatten</documentationUrl>
                             <description>
                                 This connector is an extension to the existing Confluent JDBC connector.
 
