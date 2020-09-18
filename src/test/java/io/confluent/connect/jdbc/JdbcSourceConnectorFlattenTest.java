@@ -49,11 +49,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({JdbcSourceConnector.class, DatabaseDialect.class})
+@PrepareForTest({JdbcSourceConnector_Flatten.class, DatabaseDialect.class})
 @PowerMockIgnore("javax.management.*")
-public class JdbcSourceConnectorTest {
+public class JdbcSourceConnectorFlattenTest {
 
-  private JdbcSourceConnector connector;
+  private JdbcSourceConnector_Flatten connector;
   private EmbeddedDerby db;
   private Map<String, String> connProps;
 
@@ -62,7 +62,7 @@ public class JdbcSourceConnectorTest {
 
   @Before
   public void setup() {
-    connector = new JdbcSourceConnector();
+    connector = new JdbcSourceConnector_Flatten();
     db = new EmbeddedDerby();
     connProps = new HashMap<>();
     connProps.put(JdbcSourceConnectorConfig.CONNECTION_URL_CONFIG, db.getUrl());
@@ -104,7 +104,7 @@ public class JdbcSourceConnectorTest {
   @Test
   public void testStartStop() throws Exception {
     CachedConnectionProvider mockCachedConnectionProvider = PowerMock.createMock(CachedConnectionProvider.class);
-    connector = new JdbcSourceConnector() {
+    connector = new JdbcSourceConnector_Flatten() {
         @Override
         protected CachedConnectionProvider connectionProvider(
             int maxConnAttempts,

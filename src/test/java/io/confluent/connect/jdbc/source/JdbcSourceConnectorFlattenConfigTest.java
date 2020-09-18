@@ -47,7 +47,7 @@ import static org.junit.Assert.assertTrue;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({Recommender.class})
 @PowerMockIgnore("javax.management.*")
-public class JdbcSourceConnectorConfigTest {
+public class JdbcSourceConnectorFlattenConfigTest {
 
   private EmbeddedDerby db;
   private Map<String, String> props;
