@@ -2008,4 +2008,119 @@ public class JdbcSinkTaskTestPostgresArray extends EasyMockSupport {
     );
 
   }
+
+  @Test
+  public void putSalesExampleInsertDotDelimitedTopic() throws Exception {
+    Map<String, String> props = new HashMap<>();
+    props.put("connection.url", postgresHelper.postgreSQL());
+    props.put("auto.create", "true");
+    props.put("auto.evolve", "true");
+    props.put("flatten.coordinates", "true");
+    props.put("connection.user", "postgres");
+    props.put("connection.password", "password123");
+    String timeZoneID = "Europe/Oslo";
+    props.put("db.timezone", timeZoneID);
+    props.put("flatten", "true");
+    props.put("insert.mode", "insert");
+    props.put("pk.mode", "flatten");
+    props.put("pk.fields", "saleskey.salesno, salesevent.payment.productcodes.productcodes, salesevent.salesinfo.id, salesevent.salesinfo.staff.staff.employee.id");
+    props.put("flatten.pk_propagate_value_fields", "salesevent.payment.id");
+    props.put("flatten.uppercase", "false");
+    JdbcSinkTask task = new JdbcSinkTask();
+    task.initialize(mock(SinkTaskContext.class));
+    final String topic = "sales.dot1.dot2.dot3";
+
+    task.start(props);
+
+    final Struct salesKey1 = new Struct(SALESKEY)
+            .put("salesNo", "132323")
+            .put("customerNo", "9789789");
+
+    final Struct employee1_1 = new Struct(EMPLOYEE)
+            .put("id", "232323")
+            .put("departmentNo", "34334")
+            .put("mobile", "+47 232334")
+            ;
+
+    final Struct staff1_1 = new Struct(STAFF)
+            .put("supportType", "marketing")
+            .put("employee", employee1_1)
+            ;
+    final Struct employee1_2 = new Struct(EMPLOYEE)
+            .put("id", "3442")
+            .put("departmentNo", "2781")
+            .put("mobile", "+47 990332")
+            ;
+    final Struct staff1_2 = new Struct(STAFF)
+            .put("supportType", "sales")
+            .put("employee", employee1_2)
+            ;
+
+    final ArrayList<Struct> staffArray1 = new ArrayList<>(Arrays.asList(staff1_1, staff1_2));
+
+    final Struct salesInfo1 = new Struct(SALESINFO)
+            .put("id", "1112")
+            .put("staff", staffArray1)
+            ;
+
+    final ArrayList<String> productcodes = new ArrayList<>( Arrays.asList("codeX", "codeY", "codeZ"));
+
+    final Struct payment1 = new Struct(PAYMENT)
+            .put("sumPayed", "1009.05")
+            .put("id", "XZ-ZZSD23")
+            .put("productCodes", productcodes)
+            ;
+
+    final Struct salesEvent1 = new Struct(SALESEVENT)
+            .put("payment", payment1)
+            .put("companyNo", "NO-122")
+            .put("salesInfo", salesInfo1)
+            ;
+
+
+
+    String tableName1 = (topic.replaceAll("\\.", "_") + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)).toLowerCase();
+    String tableName2 = (topic.replaceAll("\\.", "_") + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_salesinfo_staff").toLowerCase();
+    String tableName3 = (topic.replaceAll("\\.", "_") + "_" + SALESEVENT.name().substring(SALESEVENT.name().lastIndexOf(".")+1)+"_payment_productcodes").toLowerCase();
+    tablesUsed.add(tableName1);
+    tablesUsed.add(tableName2);
+    tablesUsed.add(tableName3);
+    task.put(Collections.singleton(
+            new SinkRecord(topic, 1, SALESKEY, salesKey1, SALESEVENT, salesEvent1, 1)
+    ));
+    assertEquals(
+            1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName1 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 1);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName2 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 2);
+                      }
+                    }
+            )
+    );
+    assertEquals(1,
+            postgresHelper.select(
+                    "SELECT COUNT(*) FROM " + "\"" + tableName3 + "\"",
+                    new PostgresHelper.ResultSetReadCallback() {
+                      @Override
+                      public void read(ResultSet rs) throws SQLException {
+                        assertEquals(rs.getInt(1), 3);
+                      }
+                    }
+            )
+    );
+  }
 }

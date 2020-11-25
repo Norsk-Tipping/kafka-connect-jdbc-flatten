@@ -82,7 +82,7 @@ public class JdbcDbWriter {
               //flattened record schema. So for example one for each array contained in the structure.
               //This also allows for multiple schemas on a single topic without flushing on each subsequent connect record being a different schema on the same topic
               //e.g. support for subject name strategy
-              String fullTableName = fr.topic().toLowerCase() + config.flattenDelimiter +
+              String fullTableName = fr.topic().replaceAll("\\.", config.flattenDelimiter).toLowerCase() + config.flattenDelimiter +
                       fr.valueSchema().name().replaceAll("\\.", config.flattenDelimiter).toLowerCase();
               //Replace dots that are used throughout FlattenTransformation to define paths within nested structures with configDelimiter to be database-friendly
               substructTableId = destinationTable(config.flattenUppercase ? fullTableName.toUpperCase() : fullTableName.toLowerCase());

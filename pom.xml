@@ -31,7 +31,7 @@
             <url>${confluent.maven.repo}</url>
         </pluginRepository>
     </pluginRepositories>
-
+    <version>5.1.1</version>
 
     <artifactId>kafka-connect-jdbc_flatten</artifactId>
     <packaging>jar</packaging>
