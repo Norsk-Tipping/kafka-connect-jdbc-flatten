@@ -321,13 +321,14 @@ public class BufferedRecords {
     }
   }
 
-  private String getInsertSql() {
+  private String getInsertSql() throws SQLException {
     switch (config.insertMode) {
       case INSERT:
         return dbDialect.buildInsertStatement(
             tableId,
             asColumns(fieldsMetadata.keyFieldNames),
-            asColumns(fieldsMetadata.nonKeyFieldNames)
+            asColumns(fieldsMetadata.nonKeyFieldNames),
+            dbStructure.tableDefinition(connection, tableId)
         );
       case UPSERT:
         if (fieldsMetadata.keyFieldNames.isEmpty()) {
@@ -342,14 +343,16 @@ public class BufferedRecords {
             return dbDialect.buildInsertStatement(
                     tableId,
                     asColumns(fieldsMetadata.keyFieldNames),
-                    asColumns(fieldsMetadata.nonKeyFieldNames)
+                    asColumns(fieldsMetadata.nonKeyFieldNames),
+                    dbStructure.tableDefinition(connection, tableId)
             );
           }
           else {
             return dbDialect.buildInsertStatement(
                     tableId,
                     asColumns(fieldsMetadata.keyFieldNames),
-                    asColumns(fieldsMetadata.nonKeyFieldNames)
+                    asColumns(fieldsMetadata.nonKeyFieldNames),
+                    dbStructure.tableDefinition(connection, tableId)
             );
           }
         } catch (UnsupportedOperationException e) {
@@ -363,7 +366,8 @@ public class BufferedRecords {
         return dbDialect.buildUpdateStatement(
             tableId,
             asColumns(fieldsMetadata.keyFieldNames),
-            asColumns(fieldsMetadata.nonKeyFieldNames)
+            asColumns(fieldsMetadata.nonKeyFieldNames),
+            dbStructure.tableDefinition(connection, tableId)
         );
       default:
         throw new ConnectException("Invalid insert mode");
