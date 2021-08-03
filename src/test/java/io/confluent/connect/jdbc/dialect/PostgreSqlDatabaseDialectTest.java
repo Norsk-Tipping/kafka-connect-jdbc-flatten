@@ -15,7 +15,10 @@
 
 package io.confluent.connect.jdbc.dialect;
 
+import java.sql.JDBCType;
 import java.sql.Types;
+
+import io.confluent.connect.jdbc.util.*;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
@@ -24,10 +27,10 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-
-import io.confluent.connect.jdbc.util.QuoteMethod;
-import io.confluent.connect.jdbc.util.TableId;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 
@@ -63,6 +66,7 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
   public void testCustomColumnConverters() {
     assertColumnConverter(Types.OTHER, PostgreSqlDatabaseDialect.JSON_TYPE_NAME, Schema.STRING_SCHEMA, String.class);
     assertColumnConverter(Types.OTHER, PostgreSqlDatabaseDialect.JSONB_TYPE_NAME, Schema.STRING_SCHEMA, String.class);
+    assertColumnConverter(Types.OTHER, PostgreSqlDatabaseDialect.UUID_TYPE_NAME, Schema.STRING_SCHEMA, UUID.class);
   }
 
   @Test
@@ -172,14 +176,66 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
   }
 
   @Test
+  public void shouldBuildInsertStatement() {
+    TableDefinitionBuilder builder = new TableDefinitionBuilder().withTable("myTable");
+    builder.withColumn("id1").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("id2").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("columnA").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnB").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnC").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnD").type("varchar", JDBCType.VARCHAR, String.class);
+    TableDefinition tableDefn = builder.build();
+    assertEquals(
+            "INSERT INTO \"myTable\" (\"id1\",\"id2\",\"columnA\",\"columnB\"," +
+                    "\"columnC\",\"columnD\") VALUES (?,?,?,?,?,?)",
+            dialect.buildInsertStatement(tableId, pkColumns, columnsAtoD, tableDefn)
+    );
+
+    quoteIdentfiiers = QuoteMethod.NEVER;
+    dialect = createDialect();
+
+    assertEquals(
+            "INSERT INTO myTable (id1,id2,columnA,columnB," +
+                    "columnC,columnD) VALUES (?,?,?,?,?,?)",
+            dialect.buildInsertStatement(tableId, pkColumns, columnsAtoD, tableDefn)
+    );
+
+    builder = new TableDefinitionBuilder().withTable("myTable");
+    builder.withColumn("id1").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("id2").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("columnA").type("varchar", JDBCType.VARCHAR, Integer.class);
+    builder.withColumn("uuidColumn").type("uuid", JDBCType.OTHER, UUID.class);
+    builder.withColumn("dateColumn").type("date", JDBCType.DATE, java.sql.Date.class);
+    tableDefn = builder.build();
+    List<ColumnId> nonPkColumns = new ArrayList<>();
+    nonPkColumns.add(new ColumnId(tableId, "columnA"));
+    nonPkColumns.add(new ColumnId(tableId, "uuidColumn"));
+    nonPkColumns.add(new ColumnId(tableId, "dateColumn"));
+    assertEquals(
+            "INSERT INTO myTable (" +
+                    "id1,id2,columnA,uuidColumn,dateColumn" +
+                    ") VALUES (?,?,?,?::uuid,?)",
+            dialect.buildInsertStatement(tableId, pkColumns, nonPkColumns, tableDefn)
+    );
+  }
+
+  @Test
   public void shouldBuildUpsertStatement() {
+    TableDefinitionBuilder builder = new TableDefinitionBuilder().withTable("myTable");
+    builder.withColumn("id1").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("id2").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("columnA").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnB").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnC").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("columnD").type("varchar", JDBCType.VARCHAR, String.class);
+    TableDefinition tableDefn = builder.build();
     assertEquals(
         "INSERT INTO \"myTable\" (\"id1\",\"id2\",\"columnA\",\"columnB\"," +
         "\"columnC\",\"columnD\") VALUES (?,?,?,?,?,?) ON CONFLICT (\"id1\"," +
         "\"id2\") DO UPDATE SET \"columnA\"=EXCLUDED" +
         ".\"columnA\",\"columnB\"=EXCLUDED.\"columnB\",\"columnC\"=EXCLUDED" +
         ".\"columnC\",\"columnD\"=EXCLUDED.\"columnD\"",
-        dialect.buildUpsertQueryStatement(tableId, pkColumns, columnsAtoD)
+        dialect.buildUpsertQueryStatement(tableId, pkColumns, columnsAtoD, tableDefn)
     );
 
     quoteIdentfiiers = QuoteMethod.NEVER;
@@ -191,8 +247,48 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
         "id2) DO UPDATE SET columnA=EXCLUDED" +
         ".columnA,columnB=EXCLUDED.columnB,columnC=EXCLUDED" +
         ".columnC,columnD=EXCLUDED.columnD",
-        dialect.buildUpsertQueryStatement(tableId, pkColumns, columnsAtoD)
+        dialect.buildUpsertQueryStatement(tableId, pkColumns, columnsAtoD, tableDefn)
     );
+
+    builder = new TableDefinitionBuilder().withTable("myTable");
+    builder.withColumn("id1").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("id2").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("columnA").type("varchar", JDBCType.VARCHAR, Integer.class);
+    builder.withColumn("uuidColumn").type("uuid", JDBCType.OTHER, UUID.class);
+    builder.withColumn("dateColumn").type("date", JDBCType.DATE, java.sql.Date.class);
+    tableDefn = builder.build();
+    List<ColumnId> nonPkColumns = new ArrayList<>();
+    nonPkColumns.add(new ColumnId(tableId, "columnA"));
+    nonPkColumns.add(new ColumnId(tableId, "uuidColumn"));
+    nonPkColumns.add(new ColumnId(tableId, "dateColumn"));
+    assertEquals(
+            "INSERT INTO myTable (" +
+                    "id1,id2,columnA,uuidColumn,dateColumn" +
+                    ") VALUES (?,?,?,?::uuid,?) ON CONFLICT (id1," +
+                    "id2) DO UPDATE SET " +
+                    "columnA=EXCLUDED.columnA," +
+                    "uuidColumn=EXCLUDED.uuidColumn," +
+                    "dateColumn=EXCLUDED.dateColumn",
+            dialect.buildUpsertQueryStatement(tableId, pkColumns, nonPkColumns, tableDefn)
+    );
+  }
+
+  @Test
+  public void shouldComputeValueTypeCast() {
+    TableDefinitionBuilder builder = new TableDefinitionBuilder().withTable("myTable");
+    builder.withColumn("id1").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("id2").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("columnA").type("varchar", JDBCType.VARCHAR, Integer.class);
+    builder.withColumn("uuidColumn").type("uuid", JDBCType.OTHER, UUID.class);
+    builder.withColumn("dateColumn").type("date", JDBCType.DATE, java.sql.Date.class);
+    TableDefinition tableDefn = builder.build();
+    ColumnId uuidColumn = tableDefn.definitionForColumn("uuidColumn").id();
+    ColumnId dateColumn = tableDefn.definitionForColumn("dateColumn").id();
+    assertEquals("", dialect.valueTypeCast(tableDefn, columnPK1));
+    assertEquals("", dialect.valueTypeCast(tableDefn, columnPK2));
+    assertEquals("", dialect.valueTypeCast(tableDefn, columnA));
+    assertEquals("::uuid", dialect.valueTypeCast(tableDefn, uuidColumn));
+    assertEquals("", dialect.valueTypeCast(tableDefn, dateColumn));
   }
 
   @Test
@@ -238,7 +334,13 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
 
   @Test
   public void upsert() {
-    TableId customer = tableId("Customer");
+    TableDefinitionBuilder builder = new TableDefinitionBuilder().withTable("Customer");
+    builder.withColumn("id").type("int", JDBCType.INTEGER, Integer.class);
+    builder.withColumn("name").type("varchar", JDBCType.VARCHAR, String.class);
+    builder.withColumn("salary").type("real", JDBCType.FLOAT, String.class);
+    builder.withColumn("address").type("varchar", JDBCType.VARCHAR, String.class);
+    TableDefinition tableDefn = builder.build();
+    TableId customer = tableDefn.id();
     assertEquals(
         "INSERT INTO \"Customer\" (\"id\",\"name\",\"salary\",\"address\") " +
          "VALUES (?,?,?,?) ON CONFLICT (\"id\") DO UPDATE SET \"name\"=EXCLUDED.\"name\"," +
@@ -246,7 +348,8 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
         dialect.buildUpsertQueryStatement(
             customer,
             columns(customer, "id"),
-            columns(customer, "name", "salary", "address")
+            columns(customer, "name", "salary", "address"),
+            tableDefn
         )
     );
 
@@ -256,7 +359,8 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
             dialect.buildUpsertQueryStatement(
                     customer,
                     columns(customer, "id", "name", "salary", "address"),
-                    columns(customer)
+                    columns(customer),
+                    tableDefn
             )
     );
 
@@ -270,7 +374,8 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
         dialect.buildUpsertQueryStatement(
             customer,
             columns(customer, "id"),
-            columns(customer, "name", "salary", "address")
+            columns(customer, "name", "salary", "address"),
+            tableDefn
         )
     );
 
@@ -280,7 +385,8 @@ public class PostgreSqlDatabaseDialectTest extends BaseDialectTest<PostgreSqlDat
             dialect.buildUpsertQueryStatement(
                     customer,
                     columns(customer, "id", "name", "salary", "address"),
-                    columns(customer)
+                    columns(customer),
+                    tableDefn
             )
     );
   }
