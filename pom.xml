@@ -354,7 +354,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>io.confluent.connect.jdbc.JdbcSinkConnector_Flatten</mainClass>
+                                    <mainClass>no.norsktipping.kafka.connect.jdbc.connector.JdbcSinkConnector_Flatten</mainClass>
                                 </transformer>
                             </transformers>
                             <finalName>norsktipping-${project.artifactId}-${project.version}</finalName>

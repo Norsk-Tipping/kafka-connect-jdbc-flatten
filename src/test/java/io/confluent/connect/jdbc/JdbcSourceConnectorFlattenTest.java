@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc;
 
+import no.norsktipping.kafka.connect.jdbc.connector.JdbcSourceConnector_Flatten;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.easymock.EasyMock;
 import org.easymock.Mock;
