@@ -537,6 +537,7 @@ public class FlattenTransformation {
                             .map(getSubContainersAndFieldsFunction(entries, schema)).map(s -> new Pair<>(schema, s))
                     );
           }
+
           return ((HashMap<String, Object>) os.getValue1()).entrySet().stream()
                   .map(e -> {
                     String fieldCase = ucase(fullPathDelimiter(container.getPath() + "." + container.getContainerName(), "key", true));
@@ -629,9 +630,9 @@ public class FlattenTransformation {
                   }
                 }
         );
-      } else if (type == Schema.Type.MAP && o != null && fields.size() > 1) {
-        return Stream.of(new Pair<>(fields.get(1).getTargetName(), o));
-      } else if (type == Schema.Type.ARRAY && o != null) {
+      } else if (type == Schema.Type.MAP && o != null) {
+        return Stream.of(new Pair<>(fields.get(0).getTargetName(), o));
+      }else if (type == Schema.Type.ARRAY && o != null) {
         return Stream.of(new Pair<>(fields.get(0).getTargetName(), o));
       } else {
         return Stream.empty();
