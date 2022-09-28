@@ -22,13 +22,13 @@
     <parent>
         <groupId>io.confluent</groupId>
         <artifactId>common-parent</artifactId>
-        <version>5.5.0</version>
+        <version>7.2.2</version>
     </parent>
     <pluginRepositories>
         <pluginRepository>
             <id>confluent</id>
             <name>Confluent</name>
-            <url>${confluent.maven.repo}</url>
+            <url>http://packages.confluent.io/maven/</url>
         </pluginRepository>
     </pluginRepositories>
     <version>5.5.2</version>
@@ -57,10 +57,10 @@
     <properties>
         <confluent.version>${project.version}</confluent.version>
         <derby.version>10.14.2.0</derby.version>
-        <commons-io.version>2.7</commons-io.version>
-        <kafka.connect.maven.plugin.version>0.11.1</kafka.connect.maven.plugin.version>
-        <sqlite-jdbc.version>3.25.2</sqlite-jdbc.version>
-        <postgresql.version>42.2.10</postgresql.version>
+        <commons-io.version>2.11.0</commons-io.version>
+        <kafka.connect.maven.plugin.version>0.12.0</kafka.connect.maven.plugin.version>
+        <sqlite-jdbc.version>3.39.3.0</sqlite-jdbc.version>
+        <postgresql.version>42.5.0</postgresql.version>
         <jtds.driver.version>1.3.1</jtds.driver.version>
         <licenses.name>Confluent Community License</licenses.name>
         <licenses.version>${project.version}</licenses.version>
@@ -77,7 +77,7 @@
         <repository>
             <id>confluent</id>
             <name>Confluent</name>
-            <url>${confluent.maven.repo}</url>
+            <url>http://packages.confluent.io/maven/</url>
         </repository>
     </repositories>
 
@@ -147,13 +147,13 @@
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <scope>test</scope>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.2</version>
         </dependency>
         <dependency>
             <groupId>org.sourcelab</groupId>
             <artifactId>kafka-connect-client</artifactId>
-            <version>2.1.0</version>
+            <version>4.0.1</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -161,11 +161,6 @@
                     <artifactId>log4j-slf4j-impl</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>connect-api</artifactId>
-            <version>2.5.0</version>
         </dependency>
         <dependency>
             <groupId>com.codahale.metrics</groupId>
@@ -176,25 +171,25 @@
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>common-utils</artifactId>
-            <version>5.5.0</version>
+            <version>7.2.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
-            <version>1.9.2</version>
+            <version>1.11.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.confluent</groupId>
             <artifactId>kafka-avro-serializer</artifactId>
-            <version>5.5.0</version>
+            <version>7.2.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>29.0-jre</version>
+            <version>31.1-jre</version>
         </dependency>
         <dependency>
             <groupId>org.javatuples</groupId>
@@ -204,24 +199,48 @@
         <dependency>
             <groupId>io.zonky.test</groupId>
             <artifactId>embedded-postgres</artifactId>
-            <version>1.2.6</version>
+            <version>2.0.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ch.vorburger.mariaDB4j</groupId>
             <artifactId>mariaDB4j</artifactId>
-            <version>2.4.0</version>
+            <version>2.5.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
-            <version>2.5.3</version>
+            <version>3.0.8</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-archiver</artifactId>
+            <version>4.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.activation</groupId>
+            <artifactId>javax.activation-api</artifactId>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>io.confluent</groupId>
+                    <artifactId>kafka-connect-maven-plugin</artifactId>
+                    <version>0.12.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.3.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -234,9 +253,9 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-            <plugin>
+<!--            <plugin>
                 <groupId>io.confluent</groupId>
-                <version>${kafka.connect.maven.plugin.version}</version>
+                <version>0.12.0</version>
                 <artifactId>kafka-connect-maven-plugin</artifactId>
                 <executions>
                     <execution>
@@ -295,7 +314,7 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -344,7 +363,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>3.4.0</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -363,9 +382,10 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
+<!--            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.1</version>
                 <executions>
                     <execution>
                         <id>test-jar</id>
@@ -392,7 +412,7 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-install-plugin</artifactId>
@@ -407,11 +427,6 @@
                         <phase>none</phase>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>1.2.1</version>
             </plugin>
         </plugins>
         <resources>

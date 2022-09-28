@@ -107,6 +107,7 @@ public class JdbcSinkTaskTestPostgresMap extends EasyMockSupport {
     props.put("db.timezone", timeZoneID);
     props.put("flatten", "true");
     props.put("flatten.coordinates", "true");
+    //props.put("flatten.rename_fields", "person.address.key:mapkey, person.address.address:mapvalue");
 
     JdbcSinkTask task = new JdbcSinkTask();
     task.initialize(mock(SinkTaskContext.class));
