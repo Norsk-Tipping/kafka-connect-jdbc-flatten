@@ -14,8 +14,8 @@
   ~ specific language governing permissions and limitations under the License.
   -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
 
@@ -88,7 +88,7 @@
             <scope>provided</scope>
         </dependency>
 
-         <!-- JDBC drivers, only included in runtime so they get packaged -->
+        <!-- JDBC drivers, only included in runtime so they get packaged -->
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
@@ -175,14 +175,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro</artifactId>
-            <version>1.11.4</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>io.confluent</groupId>
-            <artifactId>kafka-avro-serializer</artifactId>
+            <artifactId>kafka-connect-avro-converter</artifactId>
             <version>8.0.0</version>
             <scope>test</scope>
         </dependency>
@@ -253,7 +247,7 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-<!--            <plugin>
+            <!--            <plugin>
                 <groupId>io.confluent</groupId>
                 <version>0.12.0</version>
                 <artifactId>kafka-connect-maven-plugin</artifactId>
@@ -268,15 +262,28 @@
                             <description>
                                 This connector is an extension to the existing Confluent JDBC connector.
 
-                                With the flattening feature enabled, maps and arrays will be dereferenced and written to seperate target tables.
+                                With the flattening feature enabled, maps and arrays will be dereferenced and written to seperate
+            target tables.
 
-                                The JDBC source and sink connectors allow you to exchange data between relational databases and Kafka.
+                                The JDBC source and sink connectors allow you to exchange data between relational databases and
+            Kafka.
 
-                                The JDBC source connector allows you to import data from any relational database with a JDBC driver into Kafka topics. By using JDBC, this connector can support a wide variety of databases without requiring custom code for each one.
+                                The JDBC source connector allows you to import data from any relational database with a JDBC driver
+            into Kafka topics. By using JDBC, this connector can support a wide variety of databases
+            without requiring custom code for each one.
 
-                                Data is loaded by periodically executing a SQL query and creating an output record for each row in the result set. By default, all tables in a database are copied, each to its own output topic. The database is monitored for new or deleted tables and adapts automatically. When copying data from a table, the connector can load only new or modified rows by specifying which columns should be used to detect new or modified data.
+                                Data is loaded by periodically executing a SQL query and creating an output record for each row in
+            the result set. By default, all tables in a database are copied, each to its own output
+            topic. The database is monitored for new or deleted tables and adapts automatically.
+            When copying data from a table, the connector can load only new or modified rows by
+            specifying which columns should be used to detect new or modified data.
 
-                                The JDBC sink connector allows you to export data from Kafka topics to any relational database with a JDBC driver. By using JDBC, this connector can support a wide variety of databases without requiring a dedicated connector for each one. The connector polls data from Kafka to write to the database based on the topics subscription. It is possible to achieve idempotent writes with upserts. Auto-creation of tables, and limited auto-evolution is also supported.
+                                The JDBC sink connector allows you to export data from Kafka topics to any relational database with
+            a JDBC driver. By using JDBC, this connector can support a wide variety of databases
+            without requiring a dedicated connector for each one. The connector polls data from
+            Kafka to write to the database based on the topics subscription. It is possible to
+            achieve idempotent writes with upserts. Auto-creation of tables, and limited
+            auto-evolution is also supported.
                             </description>
                             <logo>logos/jdbc_flatten.png</logo>
 
@@ -320,7 +327,8 @@
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <executions>
                     <execution>
-                        <!--normal integration tests should not run the memory-restricted tests -->
+                        <!--normal
+                        integration tests should not run the memory-restricted tests -->
                         <id>integration-test</id>
                         <configuration>
                             <excludes>
@@ -372,8 +380,10 @@
                         </goals>
                         <configuration>
                             <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>no.norsktipping.kafka.connect.jdbc.connector.JdbcSinkConnector_Flatten</mainClass>
+                                <transformer
+                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>
+                                        no.norsktipping.kafka.connect.jdbc.connector.JdbcSinkConnector_Flatten</mainClass>
                                 </transformer>
                             </transformers>
                             <finalName>norsktipping-${project.artifactId}-${project.version}</finalName>
@@ -382,7 +392,7 @@
                     </execution>
                 </executions>
             </plugin>
-<!--            <plugin>
+            <!--            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.2.1</version>
