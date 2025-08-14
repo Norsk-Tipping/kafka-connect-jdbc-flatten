@@ -66,7 +66,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
    * Define the PG datatypes that require casting upon insert/update statements.
    */
   private static final Set<String> CAST_TYPES = Collections.unmodifiableSet(
-          Utils.mkSet(
+          Utils.mkSortedSet(
                   JSON_TYPE_NAME,
                   JSONB_TYPE_NAME,
                   UUID_TYPE_NAME
